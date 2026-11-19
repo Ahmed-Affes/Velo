@@ -16,38 +16,53 @@ export function useRealtimeRefresh(
   cbRef.current = onRefresh;
 
   useEffect(() => {
+    let channel: ReturnType<NonNullable<ReturnType<typeof getSupabaseBrowser>>["channel"]> | null = null;
     const supabase = getSupabaseBrowser();
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     const trigger = () => {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
-        void cbRef.current();
+        try {
+          void cbRef.current();
+        } catch {
+          // ignore refresh errors
+        }
       }, 200);
     };
 
-    const channel = supabase
-      ?.channel(channelName)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public" },
-        () => {
-          trigger();
-        }
-      )
-      .subscribe();
+    try {
+      if (supabase) {
+        channel = supabase
+          .channel(channelName)
+          .on("postgres_changes", { event: "*", schema: "public" }, () => {
+            trigger();
+          })
+          .subscribe();
+      }
+    } catch {
+      channel = null;
+    }
 
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") {
-        void cbRef.current();
+        try {
+          void cbRef.current();
+        } catch {
+          // ignore polling errors
+        }
       }
     }, pollMs);
 
     return () => {
       if (timer) clearTimeout(timer);
       clearInterval(interval);
-      if (channel && supabase) {
-        void supabase.removeChannel(channel);
+      try {
+        if (channel && supabase) {
+          void supabase.removeChannel(channel);
+        }
+      } catch {
+        // ignore cleanup errors
       }
     };
   }, [channelName, pollMs]);

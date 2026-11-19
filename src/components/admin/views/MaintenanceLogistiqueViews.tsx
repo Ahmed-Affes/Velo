@@ -1077,9 +1077,9 @@ export function CamionsView({
   function startEdit(c: Camion) {
     setEditing(c);
     setPlate(c.immatriculation);
-    setModele(c.modele);
-    setCapacite(c.capacite);
-    setKilometrage(c.kilometrage);
+    setModele(c.modele ?? "Renault Master L2H2");
+    setCapacite(c.capacite ?? 12);
+    setKilometrage(c.kilometrage ?? 0);
     setIdEntrepot(c.id_entrepot ?? entrepots[0]?.id_entrepot ?? 1);
     setErr(null);
   }
@@ -1218,11 +1218,11 @@ export function CamionsView({
                     <Truck className="h-4 w-4 text-[#F0A42B]" />
                     {c.immatriculation}
                   </span>
-                  <p className="mt-2 text-base font-semibold">{c.modele}</p>
+                  <p className="mt-2 text-base font-semibold">{c.modele ?? "Utilitaire VéloSf"}</p>
                   <p className="text-sm text-[#14232B]/75">
                     Entrepôt : {ent?.nom ?? "—"} · Kilométrage :{" "}
                     <span className="font-mono-sfax">
-                      {c.kilometrage.toLocaleString("fr-FR")} km
+                      {(c.kilometrage ?? 0).toLocaleString("fr-FR")} km
                     </span>
                   </p>
                 </div>
@@ -1250,7 +1250,7 @@ export function CamionsView({
 
               <div className="rounded border border-[#E3D9C6] bg-[#F6F1E7] p-3">
                 <p className="font-mono-sfax text-xs font-bold text-[#0E5A6B]">
-                  Chargement : {aboardBikes.length} / {c.capacite} vélos à bord
+                  Chargement : {aboardBikes.length} / {c.capacite ?? 12} vélos à bord
                 </p>
                 {aboardBikes.length > 0 && (
                   <p className="mt-1 font-mono-sfax text-xs">
