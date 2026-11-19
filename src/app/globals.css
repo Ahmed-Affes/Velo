@@ -1,0 +1,135 @@
+@import "tailwindcss";
+
+:root {
+  --papier: #F6F1E7;
+  --encre: #14232B;
+  --mer: #0E5A6B;
+  --safran: #F0A42B;
+  --olive: #5E7B3A;
+  --terracotta: #C8553D;
+  --brume: #9DB8BF;
+  --sel: #E3D9C6;
+  --cendre: #7A7A72;
+}
+
+@layer base {
+  html,
+  body {
+    background-color: var(--papier);
+    color: var(--encre);
+    font-family: var(--font-body), "IBM Plex Sans", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4, .font-heading {
+    font-family: var(--font-heading), "Bricolage Grotesque", system-ui, sans-serif;
+    font-weight: 600;
+  }
+
+  .font-mono-sfax {
+    font-family: var(--font-mono), "JetBrains Mono", monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  *:focus-visible {
+    outline: 3px solid var(--safran);
+    outline-offset: 2px;
+  }
+}
+
+/* Hard offset shadow & crisp 1.5px Encre borders (Salines de Sfax) */
+.card-sfax {
+  background-color: #FFFDF8;
+  border: 1.5px solid var(--encre);
+  border-radius: 6px;
+  box-shadow: 4px 4px 0 var(--encre);
+}
+
+.card-sfax-flat {
+  background-color: #FFFDF8;
+  border: 1.5px solid var(--encre);
+  border-radius: 6px;
+}
+
+.btn-sfax-primary {
+  background-color: var(--safran);
+  color: var(--encre);
+  border: 1.5px solid var(--encre);
+  border-radius: 6px;
+  box-shadow: 3px 3px 0 var(--encre);
+  font-weight: 600;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.btn-sfax-primary:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--encre);
+}
+
+.btn-sfax-primary:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--encre);
+}
+
+.btn-sfax-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn-sfax-mer {
+  background-color: var(--mer);
+  color: #FFFDF8;
+  border: 1.5px solid var(--encre);
+  border-radius: 6px;
+  box-shadow: 3px 3px 0 var(--encre);
+  font-weight: 600;
+}
+
+.btn-sfax-outline {
+  background-color: #FFFDF8;
+  color: var(--encre);
+  border: 1.5px solid var(--encre);
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+/* Signature 2: Bike tag with notched corner */
+.bike-tag {
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%);
+}
+
+/* Signature 3: Faint 8-point zellige star pattern at 4% opacity */
+.bg-zellige {
+  background-image: url("data:image/svg+xml,%3Csvg width='48' height='48' viewBox='0 0 48 48' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%2314232B' stroke-opacity='0.045' stroke-width='1.2'%3E%3Crect x='12' y='12' width='24' height='24'/%3E%3Crect x='12' y='12' width='24' height='24' transform='rotate(45 24 24)'/%3E%3Ccircle cx='24' cy='24' r='4'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* REFORME diagonal stripes */
+.bg-reforme-stripes {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(122, 122, 114, 0.14),
+    rgba(122, 122, 114, 0.14) 6px,
+    transparent 6px,
+    transparent 12px
+  );
+}
+
+/* Signature 1: Dotted route line */
+.route-line-h {
+  border-top: 2px dotted var(--mer);
+}
+
+.route-line-v {
+  border-left: 2px dotted var(--mer);
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+
+.animate-shake {
+  animation: shake 0.35s ease-in-out;
+}
