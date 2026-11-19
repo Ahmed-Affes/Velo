@@ -905,7 +905,7 @@ export function FicheVeloView({
               onClick={() => setShowReformeModal(true)}
               className="btn-sfax-outline w-full border-[#C8553D] py-2.5 text-sm text-[#9B3925]"
             >
-              Réformer ce vélo (R8)
+              Réformer ce vélo
             </button>
           )}
         </div>
@@ -1035,7 +1035,7 @@ export function AcquerirVeloView({
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Acquérir un vélo (R5)</h2>
+      <h2 className="text-2xl font-bold">Acquérir un vélo</h2>
       <RouteLineStepper
         steps={[
           { id: 1, label: "1. Vélo" },

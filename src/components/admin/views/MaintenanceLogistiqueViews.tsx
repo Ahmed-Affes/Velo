@@ -152,7 +152,7 @@ export function ReclamationsView({
                     onClick={() => onPlanifier(selected.id_reclamation)}
                     className="btn-sfax-primary px-5 py-2.5 text-sm"
                   >
-                    Planifier une réparation (R10)
+                    Planifier une réparation
                   </button>
                 )}
                 <button
@@ -458,7 +458,7 @@ export function ItinerairesView({
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h2 className="text-2xl font-bold">Créer un itinéraire (R13)</h2>
+        <h2 className="text-2xl font-bold">Créer un itinéraire</h2>
         <input
           type="date"
           value={dateIt}

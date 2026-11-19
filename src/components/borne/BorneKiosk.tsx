@@ -534,7 +534,6 @@ export function BorneKiosk({
         <div className="mx-auto my-2 w-full max-w-6xl">
           <div className="flex items-center justify-between text-xs font-mono-sfax text-[#0E5A6B]">
             <span>Session active — retour accueil dans {inactivitySec} s</span>
-            <span>Écran {screen}</span>
           </div>
           <div className="mt-1 h-2 w-full overflow-hidden rounded-full border border-[#14232B] bg-[#E3D9C6]">
             <div

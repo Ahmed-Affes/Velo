@@ -36,7 +36,7 @@ export default function HomePage() {
                 <Bike className="h-6 w-6 text-[#14232B]" />
               </div>
               <span className="mt-4 inline-block font-mono-sfax text-xs font-semibold uppercase text-[#0E5A6B]">
-                Écrans K1 → K11
+                Espace Usagers
               </span>
               <h2 className="mt-1 text-xl font-semibold">Borne de station</h2>
               <p className="mt-2 text-sm text-[#14232B]/75">
@@ -59,7 +59,7 @@ export default function HomePage() {
                 <Monitor className="h-6 w-6" />
               </div>
               <span className="mt-4 inline-block font-mono-sfax text-xs font-semibold uppercase text-[#0E5A6B]">
-                Écrans R1 → R18
+                Gestion &amp; Pilotage
               </span>
               <h2 className="mt-1 text-xl font-semibold">
                 Back-office Responsable
@@ -84,13 +84,13 @@ export default function HomePage() {
                 <Smartphone className="h-6 w-6" />
               </div>
               <span className="mt-4 inline-block font-mono-sfax text-xs font-semibold uppercase text-[#0E5A6B]">
-                Écrans T1 → T4
+                Espace Terrain
               </span>
               <h2 className="mt-1 text-xl font-semibold">
                 Application Technicien
               </h2>
               <p className="mt-2 text-sm text-[#14232B]/75">
-                Application mobile terrain : contrôle journalier des vélos,
+                Application web terrain : contrôle journalier des vélos,
                 exécution des missions de rééquilibrage et clôture des réparations.
               </p>
             </div>
