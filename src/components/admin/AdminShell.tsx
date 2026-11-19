@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useRealtimeRefresh } from "@/hooks/useRealtimeRefresh";
 import {
   LayoutDashboard,
   TrendingUp,
@@ -159,13 +160,25 @@ const ROUTE_LABELS: Record<AdminRoute, string> = {
 export function AdminShell({
   session,
   initialData,
+  initialRoute = "R1",
 }: {
   session: StaffSession;
   initialData: AdminBootstrap;
+  initialRoute?: AdminRoute;
 }) {
   const router = useRouter();
   const [data, setData] = useState<AdminBootstrap>(initialData);
-  const [route, setRoute] = useState<AdminRoute>("R1");
+  const [route, setRouteState] = useState<AdminRoute>(initialRoute);
+
+  const setRoute = useCallback((nextRoute: AdminRoute) => {
+    setRouteState(nextRoute);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", nextRoute);
+      window.history.replaceState(null, "", url.toString());
+    }
+  }, []);
+
   const [selectedBikeSerial, setSelectedBikeSerial] = useState<string | null>(
     null
   );
@@ -175,10 +188,12 @@ export function AdminShell({
   >([]);
   const [globalSearch, setGlobalSearch] = useState("");
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     const fresh = await getAdminBootstrapAction();
     setData(fresh as AdminBootstrap);
-  }
+  }, []);
+
+  useRealtimeRefresh(refresh, "velosf-admin-realtime", 4000);
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -271,6 +286,10 @@ export function AdminShell({
           </form>
 
           <div className="flex items-center gap-4">
+            <span className="hidden items-center gap-1.5 rounded-full border border-[#5E7B3A] bg-[#5E7B3A]/15 px-2.5 py-1 font-mono-sfax text-xs font-semibold text-[#3D5223] sm:inline-flex">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-[#5E7B3A]" />
+              Temps réel
+            </span>
             <button
               type="button"
               onClick={() => setRoute("R9")}
@@ -449,6 +468,9 @@ export function AdminShell({
               etapes={data.etapes}
               personnel={data.personnel}
               stations={data.stations}
+              camions={data.camions}
+              velos={data.velos}
+              onRefresh={refresh}
               onCreateNew={() => setRoute("R13")}
             />
           )}

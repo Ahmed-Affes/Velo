@@ -79,6 +79,9 @@ CREATE TABLE IF NOT EXISTS fournisseurs (
 
 CREATE TABLE IF NOT EXISTS camions (
   immatriculation VARCHAR(20) PRIMARY KEY CHECK (immatriculation ~ '^[0-9]{1,3} TUN [0-9]{1,4}$'),
+  modele VARCHAR(80) NOT NULL DEFAULT 'Renault Master',
+  capacite INT NOT NULL DEFAULT 12 CHECK (capacite > 0),
+  kilometrage INT NOT NULL DEFAULT 0 CHECK (kilometrage >= 0),
   disponible BOOLEAN NOT NULL DEFAULT TRUE,
   id_entrepot INT REFERENCES entrepots(id_entrepot) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -485,3 +488,23 @@ ALTER TABLE controles_journaliers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE itineraires ENABLE ROW LEVEL SECURITY;
 ALTER TABLE etapes_itineraire ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ordres_mission ENABLE ROW LEVEL SECURITY;
+
+-- 12. REALTIME SUPABASE (diffusion en direct des changements)
+-- ----------------------------------------------------------------------------
+DO $$
+DECLARE
+  t TEXT;
+BEGIN
+  FOREACH t IN ARRAY ARRAY[
+    'stations','entrepots','types_velo','fournisseurs','camions','velos',
+    'personnel','utilisateurs','cartes_adhesion','cartes_courte_duree',
+    'locations','reclamations','reparations','controles_journaliers',
+    'itineraires','etapes_itineraire','ordres_mission'
+  ]
+  LOOP
+    BEGIN
+      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE %I', t);
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+  END LOOP;
+END $$;

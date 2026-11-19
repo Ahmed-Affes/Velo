@@ -134,8 +134,8 @@ function LoginFormContent() {
         </div>
 
         <p className="text-xs text-[#9DB8BF]">
-          Votre rôle (Responsable ou Technicien) est détecté automatiquement à la
-          connexion.
+          Les comptes du personnel sont créés et gérés exclusivement par le
+          Responsable.
         </p>
       </aside>
 
@@ -146,7 +146,8 @@ function LoginFormContent() {
             Connexion du personnel
           </h2>
           <p className="mt-1 text-sm text-[#14232B]/70">
-            Saisissez votre matricule et votre mot de passe CycloSfaxcity.
+            Saisissez le matricule et le mot de passe remis par votre
+            Responsable.
           </p>
 
           {expired && (
@@ -287,7 +288,6 @@ function LoginFormContent() {
             </div>
           )}
 
-          {/* Comptes de démo */}
           <div className="mt-6 border-t border-dotted border-[#0E5A6B]/40 pt-4">
             <p className="mb-2 font-mono-sfax text-[11px] uppercase text-[#14232B]/65">
               Accès démo rapide (Sfax2026!)
