@@ -1,6 +1,9 @@
 @import "tailwindcss";
 
 :root {
+  --font-heading: "Bricolage Grotesque";
+  --font-body: "IBM Plex Sans";
+  --font-mono: "JetBrains Mono";
   --papier: #F6F1E7;
   --encre: #14232B;
   --mer: #0E5A6B;
