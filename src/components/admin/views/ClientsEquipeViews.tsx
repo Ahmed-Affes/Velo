@@ -617,6 +617,13 @@ export function PersonnelView({
   const [specialite, setSpecialite] = useState("Freins & transmission");
   const [password, setPassword] = useState("Sfax2026!");
   const [err, setErr] = useState<string | null>(null);
+  const [createdCreds, setCreatedCreds] = useState<{
+    matricule: number;
+    nom: string;
+    prenom: string;
+    password: string;
+    role: RolePersonnel;
+  } | null>(null);
 
   const list = personnel.filter((p) => p.role === tab);
 
@@ -676,6 +683,13 @@ export function PersonnelView({
         setErr(res.error ?? "Erreur");
         return;
       }
+      setCreatedCreds({
+        matricule: Number(matricule),
+        nom,
+        prenom,
+        password,
+        role: tab,
+      });
     }
     setShowNew(false);
     setNom("");
@@ -728,6 +742,30 @@ export function PersonnelView({
       {err && (
         <div className="rounded border border-[#C8553D] bg-[#C8553D]/12 p-3 text-sm text-[#9B3925]">
           {err}
+        </div>
+      )}
+
+      {createdCreds && (
+        <div className="card-sfax border-[#5E7B3A] bg-[#5E7B3A]/10 p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="font-semibold text-[#3D5223]">
+                Compte {createdCreds.role} créé ! Remettez ces identifiants à{" "}
+                {createdCreds.prenom} {createdCreds.nom} :
+              </p>
+              <p className="mt-2 font-mono-sfax text-base">
+                Matricule : <strong>{createdCreds.matricule}</strong> · Mot de
+                passe : <strong>{createdCreds.password}</strong>
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCreatedCreds(null)}
+              className="btn-sfax-outline px-3 py-1 text-xs"
+            >
+              Fermer
+            </button>
+          </div>
         </div>
       )}
 
