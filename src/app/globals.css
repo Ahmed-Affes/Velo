@@ -16,11 +16,16 @@
 }
 
 @layer base {
+  html {
+    font-size: 16.5px;
+  }
+
   html,
   body {
     background-color: var(--papier);
     color: var(--encre);
     font-family: var(--font-body), "IBM Plex Sans", system-ui, sans-serif;
+    line-height: 1.55;
     -webkit-font-smoothing: antialiased;
   }
 

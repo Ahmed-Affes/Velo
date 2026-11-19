@@ -39,9 +39,9 @@ ON CONFLICT (id_fournisseur) DO NOTHING;
 
 SELECT setval('fournisseurs_id_fournisseur_seq', (SELECT COALESCE(MAX(id_fournisseur), 1) FROM fournisseurs));
 
-INSERT INTO camions (immatriculation, disponible, id_entrepot) VALUES
-  ('123 TUN 4567', TRUE, 1),
-  ('208 TUN 9921', TRUE, 1)
+INSERT INTO camions (immatriculation, modele, capacite, kilometrage, disponible, id_entrepot) VALUES
+  ('123 TUN 4567', 'Renault Master L2H2', 14, 42500, TRUE, 1),
+  ('208 TUN 9921', 'Iveco Daily 35S', 16, 28900, TRUE, 1)
 ON CONFLICT (immatriculation) DO NOTHING;
 
 INSERT INTO personnel (matricule, nom, prenom, tel, role, specialite, password_hash) VALUES

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useRealtimeRefresh } from "@/hooks/useRealtimeRefresh";
 import {
   CreditCard,
   Bike,
@@ -246,6 +247,16 @@ export function BorneKiosk({
   }, [screen, unlockDone, showFaultModal]);
 
   const touchActivity = () => setInactivitySec(60);
+
+  const syncBorne = useCallback(async () => {
+    if (screen !== "K1" || !activeStation) return;
+    const fresh = await getBorneBootstrapAction(activeStation.id_station);
+    if (fresh.stations) setStations(fresh.stations);
+    if (fresh.activeStation) setActiveStation(fresh.activeStation);
+    if (fresh.bikes) setBikes(fresh.bikes as unknown as BikeItem[]);
+  }, [screen, activeStation]);
+
+  useRealtimeRefresh(syncBorne, "velosf-borne-realtime", 5000);
 
   async function switchStation(idStation: number) {
     const res = await getBorneBootstrapAction(idStation);

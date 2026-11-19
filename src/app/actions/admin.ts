@@ -109,6 +109,48 @@ export async function createStationAction(input: {
   return { ok: true, station: data };
 }
 
+export async function updateStationAction(input: {
+  idStation: number;
+  nom: string;
+  adresse: string;
+  capacite: number;
+  id_entrepot: number | null;
+  borne_hors_service?: boolean;
+  lecteur_en_panne?: boolean;
+}) {
+  await requireRole(["RESPONSABLE"]);
+  if (!input.nom.trim() || !input.adresse.trim() || input.capacite < 1) {
+    return { ok: false, error: "Nom, adresse et capacité (>= 1) requis." };
+  }
+  const supabase = getSupabaseAdmin();
+  const { data: st } = await supabase
+    .from("stations")
+    .select("nb_velos_actuel")
+    .eq("id_station", input.idStation)
+    .single();
+
+  if (st && input.capacite < st.nb_velos_actuel) {
+    return {
+      ok: false,
+      error: `Capacité impossible : ${st.nb_velos_actuel} vélos sont actuellement présents à la station.`,
+    };
+  }
+
+  const { error } = await supabase
+    .from("stations")
+    .update({
+      nom: input.nom.trim(),
+      adresse: input.adresse.trim(),
+      capacite: input.capacite,
+      id_entrepot: input.id_entrepot,
+      borne_hors_service: Boolean(input.borne_hors_service),
+      lecteur_en_panne: Boolean(input.lecteur_en_panne),
+    })
+    .eq("id_station", input.idStation);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
 export async function updateStationCapacityAction(
   idStation: number,
   capacite: number
@@ -174,6 +216,45 @@ export async function createEntrepotAction(nom: string, adresse: string) {
   return { ok: true, entrepot: data };
 }
 
+export async function updateEntrepotAction(
+  idEntrepot: number,
+  nom: string,
+  adresse: string
+) {
+  await requireRole(["RESPONSABLE"]);
+  if (!nom.trim() || !adresse.trim()) {
+    return { ok: false, error: "Nom et adresse requis." };
+  }
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase
+    .from("entrepots")
+    .update({ nom: nom.trim(), adresse: adresse.trim() })
+    .eq("id_entrepot", idEntrepot);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+export async function deleteEntrepotAction(idEntrepot: number) {
+  await requireRole(["RESPONSABLE"]);
+  const supabase = getSupabaseAdmin();
+  const { count } = await supabase
+    .from("stations")
+    .select("*", { count: "exact", head: true })
+    .eq("id_entrepot", idEntrepot);
+  if ((count ?? 0) > 0) {
+    return {
+      ok: false,
+      error: `Suppression refusée : ${count} station(s) sont rattachées à cet entrepôt.`,
+    };
+  }
+  const { error } = await supabase
+    .from("entrepots")
+    .delete()
+    .eq("id_entrepot", idEntrepot);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
 export async function createTypeVeloAction(libelle: string) {
   await requireRole(["RESPONSABLE"]);
   if (!libelle.trim()) return { ok: false, error: "Libellé requis." };
@@ -192,6 +273,25 @@ export async function createTypeVeloAction(libelle: string) {
     };
   }
   return { ok: true, type: data };
+}
+
+export async function updateTypeVeloAction(idType: number, libelle: string) {
+  await requireRole(["RESPONSABLE"]);
+  if (!libelle.trim()) return { ok: false, error: "Libellé requis." };
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase
+    .from("types_velo")
+    .update({ libelle: libelle.trim() })
+    .eq("id_type", idType);
+  if (error) {
+    return {
+      ok: false,
+      error: error.message.includes("unique")
+        ? "Ce type de vélo existe déjà."
+        : error.message,
+    };
+  }
+  return { ok: true };
 }
 
 export async function deleteTypeVeloAction(idType: number) {
@@ -236,6 +336,34 @@ export async function createFournisseurAction(input: {
     .single();
   if (error) return { ok: false, error: error.message };
   return { ok: true, fournisseur: data };
+}
+
+export async function updateFournisseurAction(input: {
+  idFournisseur: number;
+  nom: string;
+  adresse: string;
+  tel: string;
+  archive?: boolean;
+}) {
+  await requireRole(["RESPONSABLE"]);
+  if (!input.nom.trim() || !input.adresse.trim()) {
+    return { ok: false, error: "Nom et adresse requis." };
+  }
+  if (!/^\+216 [0-9]{2} [0-9]{3} [0-9]{3}$/.test(input.tel)) {
+    return { ok: false, error: "Téléphone invalide (+216 XX XXX XXX)." };
+  }
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase
+    .from("fournisseurs")
+    .update({
+      nom: input.nom.trim(),
+      adresse: input.adresse.trim(),
+      tel: input.tel,
+      ...(typeof input.archive === "boolean" ? { archive: input.archive } : {}),
+    })
+    .eq("id_fournisseur", input.idFournisseur);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
 }
 
 export async function archiveOrDeleteFournisseurAction(idFournisseur: number) {
@@ -494,6 +622,71 @@ export async function createItineraireEtMissionAction(input: {
     return { ok: false, error: "Au moins une étape est requise." };
   }
 
+  const supabase = getSupabaseAdmin();
+
+  // Simulation étape par étape : vérifie qu'aucune station ne passe < 0 ou > capacité
+  const { data: stationsRows } = await supabase
+    .from("stations")
+    .select("id_station, nom, capacite, nb_velos_actuel");
+  const stationMap = new Map(
+    (stationsRows ?? []).map((s) => [s.id_station, { ...s }])
+  );
+
+  let truckLoad = 0;
+  let truckCap = 999;
+  if (input.mission?.immatriculationCamion) {
+    const { data: cam } = await supabase
+      .from("camions")
+      .select("capacite")
+      .eq("immatriculation", input.mission.immatriculationCamion)
+      .maybeSingle();
+    if (cam?.capacite) truckCap = cam.capacite;
+  }
+
+  for (let i = 0; i < input.etapes.length; i++) {
+    const step = input.etapes[i];
+    const st = stationMap.get(step.idStation);
+    if (!st) {
+      return { ok: false, error: `Étape ${i + 1} : station introuvable.` };
+    }
+    if (step.nbVelos <= 0) {
+      return { ok: false, error: `Étape ${i + 1} : quantité invalide.` };
+    }
+
+    if (step.action === "PRENDRE") {
+      if (st.nb_velos_actuel < step.nbVelos) {
+        return {
+          ok: false,
+          error: `Étape ${i + 1} (${st.nom}) : impossible de prendre ${step.nbVelos} vélo(s), seulement ${st.nb_velos_actuel}/${st.capacite} disponible(s).`,
+        };
+      }
+      if (truckLoad + step.nbVelos > truckCap) {
+        return {
+          ok: false,
+          error: `Étape ${i + 1} : capacité du camion (${truckCap} vélos) dépassée.`,
+        };
+      }
+      st.nb_velos_actuel -= step.nbVelos;
+      truckLoad += step.nbVelos;
+    } else {
+      const freeSlots = st.capacite - st.nb_velos_actuel;
+      if (freeSlots < step.nbVelos) {
+        return {
+          ok: false,
+          error: `Étape ${i + 1} (${st.nom}) : impossible de déposer ${step.nbVelos} vélo(s), seulement ${freeSlots} place(s) libre(s) (${st.nb_velos_actuel}/${st.capacite}).`,
+        };
+      }
+      if (truckLoad < step.nbVelos) {
+        return {
+          ok: false,
+          error: `Étape ${i + 1} (${st.nom}) : le camion n'a que ${truckLoad} vélo(s) à bord pour un dépôt de ${step.nbVelos}.`,
+        };
+      }
+      st.nb_velos_actuel += step.nbVelos;
+      truckLoad -= step.nbVelos;
+    }
+  }
+
   const taken = input.etapes
     .filter((e) => e.action === "PRENDRE")
     .reduce((acc, e) => acc + e.nbVelos, 0);
@@ -508,7 +701,6 @@ export async function createItineraireEtMissionAction(input: {
     };
   }
 
-  const supabase = getSupabaseAdmin();
   const { data: it, error: itErr } = await supabase
     .from("itineraires")
     .insert({
@@ -549,6 +741,50 @@ export async function createItineraireEtMissionAction(input: {
   return { ok: true, idItineraire: it.id_itineraire };
 }
 
+export async function updateOrdreMissionAction(input: {
+  idOrdre: number;
+  matriculeTechnicien: number;
+  immatriculationCamion: string;
+  dateMission: string;
+  statut: "NON_DEMARRE" | "EN_COURS" | "TERMINE" | "ANNULE";
+}) {
+  await requireRole(["RESPONSABLE"]);
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase
+    .from("ordres_mission")
+    .update({
+      matricule_technicien: input.matriculeTechnicien,
+      immatriculation_camion: input.immatriculationCamion,
+      date_mission: input.dateMission,
+      statut: input.statut,
+    })
+    .eq("id_ordre", input.idOrdre);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+export async function deleteOrdreMissionAction(idOrdre: number) {
+  await requireRole(["RESPONSABLE"]);
+  const supabase = getSupabaseAdmin();
+  const { data: om } = await supabase
+    .from("ordres_mission")
+    .select("statut")
+    .eq("id_ordre", idOrdre)
+    .single();
+  if (om?.statut === "EN_COURS") {
+    return {
+      ok: false,
+      error: "Impossible de supprimer un ordre de mission en cours d'exécution.",
+    };
+  }
+  const { error } = await supabase
+    .from("ordres_mission")
+    .delete()
+    .eq("id_ordre", idOrdre);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
 export async function toggleCamionDisponibleAction(
   immatriculation: string,
   disponible: boolean
@@ -575,26 +811,104 @@ export async function toggleCamionDisponibleAction(
   return { ok: true };
 }
 
-export async function createCamionAction(
-  immatriculation: string,
-  idEntrepot: number | null
-) {
+export async function createCamionAction(input: {
+  immatriculation: string;
+  modele: string;
+  capacite: number;
+  kilometrage: number;
+  idEntrepot: number | null;
+}) {
   await requireRole(["RESPONSABLE"]);
-  if (!/^[0-9]{1,3} TUN [0-9]{1,4}$/.test(immatriculation.trim())) {
+  if (!/^[0-9]{1,3} TUN [0-9]{1,4}$/.test(input.immatriculation.trim())) {
     return { ok: false, error: "Format tunisien requis (ex: 123 TUN 4567)." };
+  }
+  if (input.capacite < 1) {
+    return { ok: false, error: "Capacité minimale : 1 vélo." };
   }
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("camions")
     .insert({
-      immatriculation: immatriculation.trim(),
+      immatriculation: input.immatriculation.trim(),
+      modele: input.modele.trim() || "Renault Master",
+      capacite: input.capacite,
+      kilometrage: Math.max(0, input.kilometrage),
       disponible: true,
-      id_entrepot: idEntrepot,
+      id_entrepot: input.idEntrepot,
     })
     .select()
     .single();
   if (error) return { ok: false, error: error.message };
   return { ok: true, camion: data };
+}
+
+export async function updateCamionAction(input: {
+  immatriculation: string;
+  modele: string;
+  capacite: number;
+  kilometrage: number;
+  idEntrepot: number | null;
+  disponible: boolean;
+}) {
+  await requireRole(["RESPONSABLE"]);
+  const supabase = getSupabaseAdmin();
+  const { count } = await supabase
+    .from("velos")
+    .select("*", { count: "exact", head: true })
+    .eq("immatriculation_camion", input.immatriculation);
+
+  if (!input.disponible && (count ?? 0) > 0) {
+    return {
+      ok: false,
+      error: `Impossible : ${count} vélo(s) sont à bord de ce camion.`,
+    };
+  }
+  if (input.capacite < (count ?? 0)) {
+    return {
+      ok: false,
+      error: `Capacité inférieure au nombre de vélos à bord (${count}).`,
+    };
+  }
+
+  const { error } = await supabase
+    .from("camions")
+    .update({
+      modele: input.modele.trim() || "Renault Master",
+      capacite: input.capacite,
+      kilometrage: Math.max(0, input.kilometrage),
+      id_entrepot: input.idEntrepot,
+      disponible: input.disponible,
+    })
+    .eq("immatriculation", input.immatriculation);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+export async function deleteCamionAction(immatriculation: string) {
+  await requireRole(["RESPONSABLE"]);
+  const supabase = getSupabaseAdmin();
+  const [{ count: bikes }, { count: missions }] = await Promise.all([
+    supabase
+      .from("velos")
+      .select("*", { count: "exact", head: true })
+      .eq("immatriculation_camion", immatriculation),
+    supabase
+      .from("ordres_mission")
+      .select("*", { count: "exact", head: true })
+      .eq("immatriculation_camion", immatriculation),
+  ]);
+  if ((bikes ?? 0) > 0 || (missions ?? 0) > 0) {
+    return {
+      ok: false,
+      error: `Suppression refusée : ce camion est lié à ${bikes ?? 0} vélo(s) et ${missions ?? 0} mission(s).`,
+    };
+  }
+  const { error } = await supabase
+    .from("camions")
+    .delete()
+    .eq("immatriculation", immatriculation);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
 }
 
 export async function createAbonneAction(input: {
@@ -741,6 +1055,90 @@ export async function createPersonnelAction(input: {
 
   if (error) return { ok: false, error: error.message };
   return { ok: true, person: data };
+}
+
+export async function updatePersonnelAction(input: {
+  matricule: number;
+  nom: string;
+  prenom: string;
+  tel: string;
+  role: RolePersonnel;
+  specialite?: string | null;
+  newPassword?: string;
+}) {
+  await requireRole(["RESPONSABLE"]);
+  if (!/^\+216 [0-9]{2} [0-9]{3} [0-9]{3}$/.test(input.tel)) {
+    return { ok: false, error: "Téléphone invalide (+216 XX XXX XXX)." };
+  }
+  if (input.role === "TECHNICIEN" && !input.specialite?.trim()) {
+    return { ok: false, error: "La spécialité est obligatoire pour un technicien." };
+  }
+  const supabase = getSupabaseAdmin();
+  const updateData: Record<string, unknown> = {
+    nom: input.nom.trim(),
+    prenom: input.prenom.trim(),
+    tel: input.tel,
+    role: input.role,
+    specialite: input.role === "TECHNICIEN" ? input.specialite?.trim() : null,
+  };
+  if (input.newPassword && input.newPassword.trim().length >= 6) {
+    updateData.password_hash = await bcrypt.hash(input.newPassword.trim(), 10);
+  }
+  const { error } = await supabase
+    .from("personnel")
+    .update(updateData)
+    .eq("matricule", input.matricule);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+export async function deletePersonnelAction(matricule: number) {
+  await requireRole(["RESPONSABLE"]);
+  const supabase = getSupabaseAdmin();
+  const { data: target } = await supabase
+    .from("personnel")
+    .select("role")
+    .eq("matricule", matricule)
+    .single();
+
+  if (target?.role === "RESPONSABLE") {
+    const { count } = await supabase
+      .from("personnel")
+      .select("*", { count: "exact", head: true })
+      .eq("role", "RESPONSABLE")
+      .eq("actif", true);
+    if ((count ?? 0) <= 1) {
+      return {
+        ok: false,
+        error: "Impossible de supprimer le dernier Responsable actif.",
+      };
+    }
+  }
+
+  const [{ count: reps }, { count: missions }] = await Promise.all([
+    supabase
+      .from("reparations")
+      .select("*", { count: "exact", head: true })
+      .eq("matricule_technicien", matricule),
+    supabase
+      .from("ordres_mission")
+      .select("*", { count: "exact", head: true })
+      .eq("matricule_technicien", matricule),
+  ]);
+
+  if ((reps ?? 0) > 0 || (missions ?? 0) > 0) {
+    return {
+      ok: false,
+      error: `Suppression refusée : ce membre est lié à ${reps ?? 0} réparation(s) et ${missions ?? 0} mission(s). Désactivez-le plutôt.`,
+    };
+  }
+
+  const { error } = await supabase
+    .from("personnel")
+    .delete()
+    .eq("matricule", matricule);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
 }
 
 export async function togglePersonnelActifAction(

@@ -11,6 +11,7 @@ export async function getTechnicienBootstrapAction() {
     stations,
     velos,
     types,
+    camions,
     reclamations,
     reparations,
     ordresMission,
@@ -21,6 +22,7 @@ export async function getTechnicienBootstrapAction() {
     supabase.from("stations").select("*").order("id_station"),
     supabase.from("velos").select("*").order("num_serie"),
     supabase.from("types_velo").select("*"),
+    supabase.from("camions").select("*"),
     supabase.from("reclamations").select("*").order("date_reclamation", { ascending: false }),
     supabase
       .from("reparations")
@@ -45,6 +47,7 @@ export async function getTechnicienBootstrapAction() {
     stations: stations.data ?? [],
     velos: velos.data ?? [],
     types: types.data ?? [],
+    camions: camions.data ?? [],
     reclamations: reclamations.data ?? [],
     reparations: reparations.data ?? [],
     ordresMission: ordresMission.data ?? [],

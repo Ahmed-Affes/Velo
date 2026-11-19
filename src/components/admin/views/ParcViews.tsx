@@ -1,7 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Truck, Trash2, Archive, Download, ArrowLeft } from "lucide-react";
+import {
+  Plus,
+  Truck,
+  Trash2,
+  Archive,
+  Download,
+  ArrowLeft,
+  Pencil,
+  RotateCcw,
+} from "lucide-react";
 import type {
   Station,
   Entrepot,
@@ -22,11 +31,16 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { formatDate, formatTunisianPhoneInput } from "@/lib/format";
 import {
   createStationAction,
+  updateStationAction,
   deleteStationAction,
   createEntrepotAction,
+  updateEntrepotAction,
+  deleteEntrepotAction,
   createTypeVeloAction,
+  updateTypeVeloAction,
   deleteTypeVeloAction,
   createFournisseurAction,
+  updateFournisseurAction,
   archiveOrDeleteFournisseurAction,
   acquerirVelosAction,
   reformerVeloAction,
@@ -52,33 +66,104 @@ export function StationsView({
 }) {
   const [selected, setSelected] = useState<Station | null>(null);
   const [showDrawer, setShowDrawer] = useState(false);
+  const [editing, setEditing] = useState<Station | null>(null);
+
+  // Filtres stations
+  const [search, setSearch] = useState("");
+  const [entrepotFilter, setEntrepotFilter] = useState<number | "ALL">("ALL");
+  const [fillFilter, setFillFilter] = useState<
+    "ALL" | "VIDE" | "DEFICIT" | "EQUILIBREE" | "PLEINE"
+  >("ALL");
+
+  // Formulaire création / édition
   const [nom, setNom] = useState("");
   const [adresse, setAdresse] = useState("");
   const [capacite, setCapacite] = useState(16);
   const [idEntrepot, setIdEntrepot] = useState<number>(
     entrepots[0]?.id_entrepot ?? 0
   );
+  const [borneHS, setBorneHS] = useState(false);
+  const [lecteurHS, setLecteurHS] = useState(false);
+
   const [showNewEntrepot, setShowNewEntrepot] = useState(false);
   const [newEntNom, setNewEntNom] = useState("");
   const [newEntAdr, setNewEntAdr] = useState("");
   const [err, setErr] = useState<string | null>(null);
 
-  async function handleCreateStation(e: React.FormEvent) {
-    e.preventDefault();
-    setErr(null);
-    const res = await createStationAction({
-      nom,
-      adresse,
-      capacite,
-      id_entrepot: idEntrepot || null,
-    });
-    if (!res.ok) {
-      setErr(res.error ?? "Erreur");
-      return;
+  const filteredStations = stations.filter((s) => {
+    if (
+      search &&
+      !`${s.nom} ${s.adresse}`.toLowerCase().includes(search.toLowerCase())
+    ) {
+      return false;
     }
-    setShowDrawer(false);
+    if (entrepotFilter !== "ALL" && s.id_entrepot !== entrepotFilter) {
+      return false;
+    }
+    const ratio = s.capacite > 0 ? s.nb_velos_actuel / s.capacite : 0;
+    if (fillFilter === "VIDE" && s.nb_velos_actuel !== 0) return false;
+    if (fillFilter === "PLEINE" && s.nb_velos_actuel < s.capacite) return false;
+    if (fillFilter === "DEFICIT" && ratio > 0.3) return false;
+    if (fillFilter === "EQUILIBREE" && (ratio <= 0.3 || ratio >= 0.75))
+      return false;
+    return true;
+  });
+
+  function openEdit(s: Station) {
+    setEditing(s);
+    setShowDrawer(true);
+    setNom(s.nom);
+    setAdresse(s.adresse);
+    setCapacite(s.capacite);
+    setIdEntrepot(s.id_entrepot ?? 0);
+    setBorneHS(s.borne_hors_service);
+    setLecteurHS(s.lecteur_en_panne);
+    setErr(null);
+  }
+
+  function openNew() {
+    setEditing(null);
+    setShowDrawer((v) => !v);
     setNom("");
     setAdresse("");
+    setCapacite(16);
+    setIdEntrepot(entrepots[0]?.id_entrepot ?? 0);
+    setBorneHS(false);
+    setLecteurHS(false);
+    setErr(null);
+  }
+
+  async function handleSaveStation(e: React.FormEvent) {
+    e.preventDefault();
+    setErr(null);
+    if (editing) {
+      const res = await updateStationAction({
+        idStation: editing.id_station,
+        nom,
+        adresse,
+        capacite,
+        id_entrepot: idEntrepot || null,
+        borne_hors_service: borneHS,
+        lecteur_en_panne: lecteurHS,
+      });
+      if (!res.ok) {
+        setErr(res.error ?? "Erreur");
+        return;
+      }
+    } else {
+      const res = await createStationAction({
+        nom,
+        adresse,
+        capacite,
+        id_entrepot: idEntrepot || null,
+      });
+      if (!res.ok) {
+        setErr(res.error ?? "Erreur");
+        return;
+      }
+    }
+    setShowDrawer(false);
+    setEditing(null);
     await onRefresh();
   }
 
@@ -97,16 +182,71 @@ export function StationsView({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Stations ({stations.length})</h2>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h2 className="text-2xl font-bold">
+          Stations ({filteredStations.length}/{stations.length})
+        </h2>
         <button
           type="button"
-          onClick={() => setShowDrawer((v) => !v)}
-          className="btn-sfax-primary inline-flex items-center gap-2 px-4 py-2 text-sm"
+          onClick={openNew}
+          className="btn-sfax-primary inline-flex items-center gap-2 px-4 py-2.5 text-sm"
         >
           <Plus className="h-4 w-4" />
           Nouvelle station
         </button>
+      </div>
+
+      {/* Barre de filtrage Stations */}
+      <div className="card-sfax-flat flex flex-wrap items-center gap-3 p-4">
+        <input
+          type="text"
+          placeholder="Rechercher par nom ou adresse..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="min-w-[220px] flex-1 rounded-[6px] border-[1.5px] border-[#14232B] bg-[#F6F1E7] px-3 py-2 text-sm"
+        />
+        <select
+          value={entrepotFilter}
+          onChange={(e) =>
+            setEntrepotFilter(
+              e.target.value === "ALL" ? "ALL" : Number(e.target.value)
+            )
+          }
+          className="rounded-[6px] border-[1.5px] border-[#14232B] bg-[#F6F1E7] px-3 py-2 text-sm"
+        >
+          <option value="ALL">Tous les entrepôts</option>
+          {entrepots.map((e) => (
+            <option key={e.id_entrepot} value={e.id_entrepot}>
+              {e.nom}
+            </option>
+          ))}
+        </select>
+        <select
+          value={fillFilter}
+          onChange={(e) =>
+            setFillFilter(e.target.value as typeof fillFilter)
+          }
+          className="rounded-[6px] border-[1.5px] border-[#14232B] bg-[#F6F1E7] px-3 py-2 text-sm"
+        >
+          <option value="ALL">Tous états</option>
+          <option value="VIDE">Vide (0)</option>
+          <option value="DEFICIT">Déficit (&le; 30%)</option>
+          <option value="EQUILIBREE">Équilibrée</option>
+          <option value="PLEINE">Pleine (100%)</option>
+        </select>
+        {(search || entrepotFilter !== "ALL" || fillFilter !== "ALL") && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearch("");
+              setEntrepotFilter("ALL");
+              setFillFilter("ALL");
+            }}
+            className="btn-sfax-outline inline-flex items-center gap-1.5 px-3 py-2 text-sm"
+          >
+            <RotateCcw className="h-3.5 w-3.5" /> Réinitialiser
+          </button>
+        )}
       </div>
 
       {err && (
@@ -116,8 +256,22 @@ export function StationsView({
       )}
 
       {showDrawer && (
-        <form onSubmit={handleCreateStation} className="card-sfax space-y-4 p-5">
-          <h3 className="text-lg font-bold">Ajouter une station</h3>
+        <form onSubmit={handleSaveStation} className="card-sfax space-y-4 p-5">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-bold">
+              {editing ? `Modifier : ${editing.nom}` : "Ajouter une station"}
+            </h3>
+            <button
+              type="button"
+              onClick={() => {
+                setShowDrawer(false);
+                setEditing(null);
+              }}
+              className="text-sm font-semibold underline"
+            >
+              Fermer
+            </button>
+          </div>
           <div className="grid gap-4 md:grid-cols-4">
             <input
               type="text"
@@ -165,6 +319,27 @@ export function StationsView({
             </div>
           </div>
 
+          {editing && (
+            <div className="flex flex-wrap gap-6 text-sm">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={borneHS}
+                  onChange={(e) => setBorneHS(e.target.checked)}
+                />
+                Borne hors service
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={lecteurHS}
+                  onChange={(e) => setLecteurHS(e.target.checked)}
+                />
+                Lecteur optique en panne
+              </label>
+            </div>
+          )}
+
           {showNewEntrepot && (
             <div className="flex flex-wrap gap-2 rounded border border-[#0E5A6B] bg-[#F6F1E7] p-3">
               <input
@@ -172,78 +347,91 @@ export function StationsView({
                 placeholder="Nom entrepôt"
                 value={newEntNom}
                 onChange={(e) => setNewEntNom(e.target.value)}
-                className="rounded border border-[#14232B] bg-white px-2.5 py-1.5 text-xs"
+                className="rounded border border-[#14232B] bg-white px-2.5 py-1.5 text-sm"
               />
               <input
                 type="text"
                 placeholder="Adresse entrepôt"
                 value={newEntAdr}
                 onChange={(e) => setNewEntAdr(e.target.value)}
-                className="flex-1 rounded border border-[#14232B] bg-white px-2.5 py-1.5 text-xs"
+                className="flex-1 rounded border border-[#14232B] bg-white px-2.5 py-1.5 text-sm"
               />
               <button
                 type="button"
                 onClick={handleAddEntrepot}
-                className="btn-sfax-mer px-3 py-1.5 text-xs"
+                className="btn-sfax-mer px-3 py-1.5 text-sm"
               >
                 Créer l&apos;entrepôt
               </button>
             </div>
           )}
 
-          <button type="submit" className="btn-sfax-primary px-5 py-2 text-sm">
-            Enregistrer la station
+          <button type="submit" className="btn-sfax-primary px-5 py-2.5 text-sm">
+            {editing ? "Enregistrer les modifications" : "Enregistrer la station"}
           </button>
         </form>
       )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="card-sfax-flat overflow-x-auto lg:col-span-2">
-          <table className="w-full text-left text-sm">
+          <table className="w-full text-left text-base">
             <thead className="border-b-[1.5px] border-[#14232B] bg-[#F6F1E7] font-mono-sfax text-xs uppercase">
               <tr>
-                <th className="p-3">Station</th>
-                <th className="p-3">Entrepôt</th>
-                <th className="p-3">Remplissage</th>
-                <th className="p-3">Action</th>
+                <th className="p-3.5">Station</th>
+                <th className="p-3.5">Entrepôt</th>
+                <th className="p-3.5">Remplissage</th>
+                <th className="p-3.5">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E3D9C6]">
-              {stations.map((s) => (
+              {filteredStations.map((s) => (
                 <tr
                   key={s.id_station}
                   onClick={() => setSelected(s)}
                   className="cursor-pointer hover:bg-[#F6F1E7]/70"
                 >
-                  <td className="p-3">
+                  <td className="p-3.5">
                     <p className="font-semibold">{s.nom}</p>
-                    <p className="text-xs text-[#14232B]/70">{s.adresse}</p>
+                    <p className="text-sm text-[#14232B]/70">{s.adresse}</p>
                   </td>
-                  <td className="p-3 text-xs">
+                  <td className="p-3.5 text-sm">
                     {entrepots.find((e) => e.id_entrepot === s.id_entrepot)?.nom ??
                       "Sans entrepôt"}
                   </td>
-                  <td className="p-3">
+                  <td className="p-3.5">
                     <SlotTicks
                       occupied={s.nb_velos_actuel}
                       capacity={s.capacite}
                       size="sm"
                     />
                   </td>
-                  <td className="p-3">
-                    <button
-                      type="button"
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        const r = await deleteStationAction(s.id_station);
-                        if (!r.ok && r.error) setErr(r.error);
-                        await onRefresh();
-                      }}
-                      className="rounded border border-[#C8553D] p-1.5 text-[#9B3925] hover:bg-[#C8553D]/10"
-                      aria-label={`Supprimer ${s.nom}`}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                  <td className="p-3.5">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEdit(s);
+                        }}
+                        className="rounded border border-[#14232B] bg-[#F6F1E7] p-2 hover:bg-[#E3D9C6]"
+                        aria-label={`Modifier ${s.nom}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          const r = await deleteStationAction(s.id_station);
+                          if (!r.ok && r.error) setErr(r.error);
+                          await onRefresh();
+                        }}
+                        className="rounded border border-[#C8553D] p-2 text-[#9B3925] hover:bg-[#C8553D]/10"
+                        aria-label={`Supprimer ${s.nom}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -278,13 +466,23 @@ export function ParcVelosView({
 }) {
   const [search, setSearch] = useState("");
   const [etatFilter, setEtatFilter] = useState<EtatVelo | "ALL">("ALL");
+  const [typeFilter, setTypeFilter] = useState<number | "ALL">("ALL");
+  const [stationFilter, setStationFilter] = useState<number | "ALL">("ALL");
+  const [fournFilter, setFournFilter] = useState<number | "ALL">("ALL");
+  const [couleurFilter, setCouleurFilter] = useState<string>("ALL");
   const [showReformes, setShowReformes] = useState(false);
+
+  const uniqueColors = Array.from(new Set(velos.map((v) => v.couleur)));
 
   const filtered = velos.filter((v) => {
     if (!showReformes && v.etat === "REFORME" && etatFilter !== "REFORME") {
       return false;
     }
     if (etatFilter !== "ALL" && v.etat !== etatFilter) return false;
+    if (typeFilter !== "ALL" && v.id_type !== typeFilter) return false;
+    if (stationFilter !== "ALL" && v.id_station !== stationFilter) return false;
+    if (fournFilter !== "ALL" && v.id_fournisseur !== fournFilter) return false;
+    if (couleurFilter !== "ALL" && v.couleur !== couleurFilter) return false;
     if (search && !v.num_serie.toLowerCase().includes(search.toLowerCase())) {
       return false;
     }
@@ -305,6 +503,14 @@ export function ParcVelosView({
     URL.revokeObjectURL(url);
   }
 
+  const hasFilters =
+    search ||
+    etatFilter !== "ALL" ||
+    typeFilter !== "ALL" ||
+    stationFilter !== "ALL" ||
+    fournFilter !== "ALL" ||
+    couleurFilter !== "ALL";
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -315,7 +521,7 @@ export function ParcVelosView({
           <button
             type="button"
             onClick={exportCsv}
-            className="btn-sfax-outline inline-flex items-center gap-1.5 px-3 py-2 text-sm"
+            className="btn-sfax-outline inline-flex items-center gap-1.5 px-3.5 py-2 text-sm"
           >
             <Download className="h-4 w-4" /> Exporter CSV
           </button>
@@ -329,49 +535,139 @@ export function ParcVelosView({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <input
-          type="text"
-          placeholder="Rechercher VSF-..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="rounded-[6px] border-[1.5px] border-[#14232B] bg-[#FFFDF8] px-3 py-1.5 font-mono-sfax text-sm"
-        />
-        {(
-          ["ALL", "DISPONIBLE", "LOUE", "EN_PANNE", "EN_REPARATION", "REFORME"] as const
-        ).map((et) => (
-          <button
-            key={et}
-            type="button"
-            onClick={() => setEtatFilter(et)}
-            className={`rounded-[6px] border border-[#14232B] px-3 py-1 font-mono-sfax text-xs font-semibold ${
-              etatFilter === et ? "bg-[#0E5A6B] text-white" : "bg-[#FFFDF8]"
-            }`}
-          >
-            {et === "ALL" ? "Tous" : et}
-          </button>
-        ))}
-        <label className="ml-auto flex items-center gap-2 text-xs font-medium">
+      <div className="card-sfax-flat space-y-3 p-4">
+        <div className="flex flex-wrap items-center gap-3">
           <input
-            type="checkbox"
-            checked={showReformes}
-            onChange={(e) => setShowReformes(e.target.checked)}
+            type="text"
+            placeholder="Rechercher VSF-..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="rounded-[6px] border-[1.5px] border-[#14232B] bg-[#F6F1E7] px-3 py-2 font-mono-sfax text-sm"
           />
-          Afficher les vélos réformés
-        </label>
+          <select
+            value={typeFilter}
+            onChange={(e) =>
+              setTypeFilter(
+                e.target.value === "ALL" ? "ALL" : Number(e.target.value)
+              )
+            }
+            className="rounded-[6px] border-[1.5px] border-[#14232B] bg-[#F6F1E7] px-3 py-2 text-sm"
+          >
+            <option value="ALL">Tous les types</option>
+            {types.map((t) => (
+              <option key={t.id_type} value={t.id_type}>
+                {t.libelle}
+              </option>
+            ))}
+          </select>
+          <select
+            value={stationFilter}
+            onChange={(e) =>
+              setStationFilter(
+                e.target.value === "ALL" ? "ALL" : Number(e.target.value)
+              )
+            }
+            className="rounded-[6px] border-[1.5px] border-[#14232B] bg-[#F6F1E7] px-3 py-2 text-sm"
+          >
+            <option value="ALL">Toutes les stations</option>
+            {stations.map((s) => (
+              <option key={s.id_station} value={s.id_station}>
+                {s.nom}
+              </option>
+            ))}
+          </select>
+          <select
+            value={fournFilter}
+            onChange={(e) =>
+              setFournFilter(
+                e.target.value === "ALL" ? "ALL" : Number(e.target.value)
+              )
+            }
+            className="rounded-[6px] border-[1.5px] border-[#14232B] bg-[#F6F1E7] px-3 py-2 text-sm"
+          >
+            <option value="ALL">Tous fournisseurs</option>
+            {fournisseurs.map((f) => (
+              <option key={f.id_fournisseur} value={f.id_fournisseur}>
+                {f.nom}
+              </option>
+            ))}
+          </select>
+          <select
+            value={couleurFilter}
+            onChange={(e) => setCouleurFilter(e.target.value)}
+            className="rounded-[6px] border-[1.5px] border-[#14232B] bg-[#F6F1E7] px-3 py-2 text-sm"
+          >
+            <option value="ALL">Toutes couleurs</option>
+            {uniqueColors.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {(
+            [
+              "ALL",
+              "DISPONIBLE",
+              "LOUE",
+              "EN_PANNE",
+              "EN_REPARATION",
+              "REFORME",
+            ] as const
+          ).map((et) => (
+            <button
+              key={et}
+              type="button"
+              onClick={() => setEtatFilter(et)}
+              className={`rounded-[6px] border border-[#14232B] px-3 py-1 font-mono-sfax text-xs font-semibold ${
+                etatFilter === et ? "bg-[#0E5A6B] text-white" : "bg-[#FFFDF8]"
+              }`}
+            >
+              {et === "ALL" ? "Tous états" : et}
+            </button>
+          ))}
+
+          {hasFilters && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch("");
+                setEtatFilter("ALL");
+                setTypeFilter("ALL");
+                setStationFilter("ALL");
+                setFournFilter("ALL");
+                setCouleurFilter("ALL");
+              }}
+              className="btn-sfax-outline inline-flex items-center gap-1 px-3 py-1 text-xs"
+            >
+              <RotateCcw className="h-3 w-3" /> Réinitialiser
+            </button>
+          )}
+
+          <label className="ml-auto flex items-center gap-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              checked={showReformes}
+              onChange={(e) => setShowReformes(e.target.checked)}
+            />
+            Afficher les vélos réformés
+          </label>
+        </div>
       </div>
 
       <div className="card-sfax-flat overflow-x-auto">
-        <table className="w-full text-left text-sm">
+        <table className="w-full text-left text-base">
           <thead className="border-b-[1.5px] border-[#14232B] bg-[#F6F1E7] font-mono-sfax text-xs uppercase">
             <tr>
-              <th className="p-3">N° Série</th>
-              <th className="p-3">Type</th>
-              <th className="p-3">Couleur</th>
-              <th className="p-3">Fournisseur</th>
-              <th className="p-3">Localisation</th>
-              <th className="p-3">État</th>
-              <th className="p-3">Acquisition</th>
+              <th className="p-3.5">N° Série</th>
+              <th className="p-3.5">Type</th>
+              <th className="p-3.5">Couleur</th>
+              <th className="p-3.5">Fournisseur</th>
+              <th className="p-3.5">Localisation</th>
+              <th className="p-3.5">État</th>
+              <th className="p-3.5">Acquisition</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#E3D9C6]">
@@ -383,28 +679,28 @@ export function ParcVelosView({
                   v.etat === "REFORME" ? "bg-reforme-stripes opacity-70" : ""
                 }`}
               >
-                <td className="p-3 font-mono-sfax font-bold text-[#0E5A6B]">
+                <td className="p-3.5 font-mono-sfax font-bold text-[#0E5A6B]">
                   {v.num_serie}
                 </td>
-                <td className="p-3">
+                <td className="p-3.5">
                   {types.find((t) => t.id_type === v.id_type)?.libelle}
                 </td>
-                <td className="p-3">
+                <td className="p-3.5">
                   <span className="inline-flex items-center gap-1.5">
                     <span
-                      className="h-3 w-3 rounded-full border border-[#14232B]"
+                      className="h-3.5 w-3.5 rounded-full border border-[#14232B]"
                       style={{ backgroundColor: v.couleur_hex }}
                     />
                     {v.couleur}
                   </span>
                 </td>
-                <td className="p-3 text-xs">
+                <td className="p-3.5 text-sm">
                   {fournisseurs.find((f) => f.id_fournisseur === v.id_fournisseur)?.nom}
                 </td>
-                <td className="p-3 text-xs">
+                <td className="p-3.5 text-sm">
                   {v.immatriculation_camion ? (
                     <span className="inline-flex items-center gap-1 font-mono-sfax font-semibold text-[#0E5A6B]">
-                      <Truck className="h-3.5 w-3.5" /> {v.immatriculation_camion}
+                      <Truck className="h-4 w-4" /> {v.immatriculation_camion}
                     </span>
                   ) : v.id_station ? (
                     stations.find((s) => s.id_station === v.id_station)?.nom
@@ -412,10 +708,10 @@ export function ParcVelosView({
                     "—"
                   )}
                 </td>
-                <td className="p-3">
+                <td className="p-3.5">
                   <StatusChip etat={v.etat} />
                 </td>
-                <td className="p-3 font-mono-sfax text-xs">
+                <td className="p-3.5 font-mono-sfax text-sm">
                   {formatDate(v.date_acquisition)}
                 </td>
               </tr>
@@ -493,7 +789,7 @@ export function FicheVeloView({
             </h2>
             <StatusChip etat={velo.etat} size="md" />
           </div>
-          <p className="mt-2 text-sm text-[#14232B]/75">
+          <p className="mt-2 text-base text-[#14232B]/75">
             {types.find((t) => t.id_type === velo.id_type)?.libelle} ·{" "}
             {velo.couleur} · Fournisseur :{" "}
             <strong>
@@ -502,12 +798,12 @@ export function FicheVeloView({
             · Acquis le {formatDate(velo.date_acquisition)}
           </p>
           {velo.remplace_num_serie && (
-            <p className="mt-1 font-mono-sfax text-xs text-[#0E5A6B]">
+            <p className="mt-1 font-mono-sfax text-sm text-[#0E5A6B]">
               Remplace le vélo {velo.remplace_num_serie}
             </p>
           )}
         </div>
-        <div className="text-right font-mono-sfax text-sm">
+        <div className="text-right font-mono-sfax text-base">
           <p className="text-xs uppercase text-[#14232B]/60">Localisation</p>
           <p className="font-semibold">
             {velo.id_station
@@ -524,7 +820,6 @@ export function FicheVeloView({
       )}
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Timeline verticale en ligne de route */}
         <div className="card-sfax-flat p-6 lg:col-span-2">
           <h3 className="text-lg font-bold">Historique du vélo</h3>
           <div className="mt-4 space-y-4 border-l-2 border-dotted border-[#0E5A6B] pl-5">
@@ -582,7 +877,6 @@ export function FicheVeloView({
           </div>
         </div>
 
-        {/* Actions contextuelles */}
         <div className="card-sfax space-y-3 p-5">
           <h3 className="text-lg font-bold">Actions</h3>
           {velo.etat === "LOUE" && (
@@ -617,14 +911,13 @@ export function FicheVeloView({
         </div>
       </div>
 
-      {/* R8 Modale Réformer un vélo */}
       {showReformeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#14232B]/55 p-4">
           <div className="card-sfax w-full max-w-md space-y-4 p-6">
             <h3 className="text-xl font-bold">
               Réformer le vélo {velo.num_serie}
             </h3>
-            <div className="rounded border border-[#C8553D] bg-[#C8553D]/12 p-3 text-xs text-[#9B3925]">
+            <div className="rounded border border-[#C8553D] bg-[#C8553D]/12 p-3 text-sm text-[#9B3925]">
               Action irréversible. Le vélo sera retiré de sa station et marqué
               REFORME.
             </div>
@@ -771,7 +1064,7 @@ export function AcquerirVeloView({
                 <label className="text-sm font-semibold">
                   Numéro(s) de série (VSF-XXXXXX)
                 </label>
-                <label className="flex items-center gap-2 text-xs">
+                <label className="flex items-center gap-2 text-sm">
                   <input
                     type="checkbox"
                     checked={seriesMode}
@@ -907,14 +1200,14 @@ export function AcquerirVeloView({
                     placeholder="Nom fournisseur"
                     value={newFNom}
                     onChange={(e) => setNewFNom(e.target.value)}
-                    className="w-full rounded border border-[#14232B] bg-white px-2.5 py-1.5 text-xs"
+                    className="w-full rounded border border-[#14232B] bg-white px-2.5 py-1.5 text-sm"
                   />
                   <input
                     type="text"
                     placeholder="Adresse"
                     value={newFAdr}
                     onChange={(e) => setNewFAdr(e.target.value)}
-                    className="w-full rounded border border-[#14232B] bg-white px-2.5 py-1.5 text-xs"
+                    className="w-full rounded border border-[#14232B] bg-white px-2.5 py-1.5 text-sm"
                   />
                   <input
                     type="text"
@@ -922,7 +1215,7 @@ export function AcquerirVeloView({
                     onChange={(e) =>
                       setNewFTel(formatTunisianPhoneInput(e.target.value))
                     }
-                    className="w-full rounded border border-[#14232B] bg-white px-2.5 py-1.5 font-mono-sfax text-xs"
+                    className="w-full rounded border border-[#14232B] bg-white px-2.5 py-1.5 font-mono-sfax text-sm"
                   />
                   <button
                     type="button"
@@ -938,7 +1231,7 @@ export function AcquerirVeloView({
                         setIdFournisseur(r.fournisseur.id_fournisseur);
                       }
                     }}
-                    className="btn-sfax-mer px-3 py-1.5 text-xs"
+                    className="btn-sfax-mer px-3 py-1.5 text-sm"
                   >
                     Créer et sélectionner
                   </button>
@@ -1046,7 +1339,6 @@ export function AcquerirVeloView({
           )}
         </div>
 
-        {/* Résumé en direct */}
         <div className="card-sfax-flat space-y-3 bg-[#FFFDF8] p-5">
           <span className="font-mono-sfax text-xs uppercase text-[#0E5A6B]">
             Aperçu fiche vélo
@@ -1082,20 +1374,32 @@ export function FournisseursView({
   velos: Velo[];
   onRefresh: () => Promise<void>;
 }) {
+  const [editing, setEditing] = useState<Fournisseur | null>(null);
   const [nom, setNom] = useState("");
   const [adresse, setAdresse] = useState("");
   const [tel, setTel] = useState("+216 ");
   const [msg, setMsg] = useState<string | null>(null);
 
-  const similarMatch = nom.trim().length >= 4
-    ? fournisseurs.find((f) =>
-        f.nom.toLowerCase().includes(nom.trim().toLowerCase())
-      )
-    : null;
+  const similarMatch =
+    !editing && nom.trim().length >= 4
+      ? fournisseurs.find((f) =>
+          f.nom.toLowerCase().includes(nom.trim().toLowerCase())
+        )
+      : null;
+
+  function startEdit(f: Fournisseur) {
+    setEditing(f);
+    setNom(f.nom);
+    setAdresse(f.adresse);
+    setTel(f.tel);
+    setMsg(null);
+  }
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Fournisseurs ({fournisseurs.length})</h2>
+      <h2 className="text-2xl font-bold">
+        Fournisseurs ({fournisseurs.length})
+      </h2>
       {msg && (
         <div className="rounded border border-[#0E5A6B] bg-[#0E5A6B]/10 p-3 text-sm">
           {msg}
@@ -1105,10 +1409,25 @@ export function FournisseursView({
       <form
         onSubmit={async (e) => {
           e.preventDefault();
-          const r = await createFournisseurAction({ nom, adresse, tel });
-          if (!r.ok) {
-            setMsg(r.error ?? "Erreur");
-            return;
+          setMsg(null);
+          if (editing) {
+            const r = await updateFournisseurAction({
+              idFournisseur: editing.id_fournisseur,
+              nom,
+              adresse,
+              tel,
+            });
+            if (!r.ok) {
+              setMsg(r.error ?? "Erreur");
+              return;
+            }
+            setEditing(null);
+          } else {
+            const r = await createFournisseurAction({ nom, adresse, tel });
+            if (!r.ok) {
+              setMsg(r.error ?? "Erreur");
+              return;
+            }
           }
           setNom("");
           setAdresse("");
@@ -1140,9 +1459,28 @@ export function FournisseursView({
           required
           className="rounded border border-[#14232B] bg-[#F6F1E7] px-3 py-2 font-mono-sfax text-sm"
         />
-        <button type="submit" className="btn-sfax-primary px-4 py-2 text-sm">
-          Ajouter fournisseur
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="submit"
+            className="btn-sfax-primary flex-1 px-4 py-2 text-sm"
+          >
+            {editing ? "Enregistrer" : "Ajouter"}
+          </button>
+          {editing && (
+            <button
+              type="button"
+              onClick={() => {
+                setEditing(null);
+                setNom("");
+                setAdresse("");
+                setTel("+216 ");
+              }}
+              className="btn-sfax-outline px-3 py-2 text-sm"
+            >
+              Annuler
+            </button>
+          )}
+        </div>
         {similarMatch && (
           <p className="md:col-span-4 text-xs font-semibold text-[#B8740B]">
             Nom similaire détecté : « {similarMatch.nom} » existe déjà.
@@ -1151,14 +1489,14 @@ export function FournisseursView({
       </form>
 
       <div className="card-sfax-flat overflow-x-auto">
-        <table className="w-full text-left text-sm">
+        <table className="w-full text-left text-base">
           <thead className="border-b-[1.5px] border-[#14232B] bg-[#F6F1E7] font-mono-sfax text-xs uppercase">
             <tr>
-              <th className="p-3">Nom</th>
-              <th className="p-3">Adresse</th>
-              <th className="p-3">Téléphone</th>
-              <th className="p-3">Vélos fournis</th>
-              <th className="p-3">Action</th>
+              <th className="p-3.5">Nom</th>
+              <th className="p-3.5">Adresse</th>
+              <th className="p-3.5">Téléphone</th>
+              <th className="p-3.5">Vélos fournis</th>
+              <th className="p-3.5">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#E3D9C6]">
@@ -1167,30 +1505,56 @@ export function FournisseursView({
                 (v) => v.id_fournisseur === f.id_fournisseur
               ).length;
               return (
-                <tr key={f.id_fournisseur} className={f.archive ? "opacity-50" : ""}>
-                  <td className="p-3 font-semibold">
+                <tr key={f.id_fournisseur} className={f.archive ? "opacity-55" : ""}>
+                  <td className="p-3.5 font-semibold">
                     {f.nom} {f.archive && "(Archivé)"}
                   </td>
-                  <td className="p-3 text-xs">{f.adresse}</td>
-                  <td className="p-3 font-mono-sfax text-xs">{f.tel}</td>
-                  <td className="p-3 font-mono-sfax">{count}</td>
-                  <td className="p-3">
-                    {!f.archive && (
+                  <td className="p-3.5 text-sm">{f.adresse}</td>
+                  <td className="p-3.5 font-mono-sfax text-sm">{f.tel}</td>
+                  <td className="p-3.5 font-mono-sfax">{count}</td>
+                  <td className="p-3.5">
+                    <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={async () => {
-                          const r = await archiveOrDeleteFournisseurAction(
-                            f.id_fournisseur
-                          );
-                          if (r.message) setMsg(r.message);
-                          await onRefresh();
-                        }}
-                        className="inline-flex items-center gap-1 rounded border border-[#14232B] px-2 py-1 text-xs"
+                        onClick={() => startEdit(f)}
+                        className="inline-flex items-center gap-1 rounded border border-[#14232B] bg-[#F6F1E7] px-2.5 py-1 text-xs font-semibold hover:bg-[#E3D9C6]"
                       >
-                        <Archive className="h-3.5 w-3.5" />{" "}
-                        {count > 0 ? "Archiver" : "Supprimer"}
+                        <Pencil className="h-3.5 w-3.5" /> Modifier
                       </button>
-                    )}
+                      {f.archive ? (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await updateFournisseurAction({
+                              idFournisseur: f.id_fournisseur,
+                              nom: f.nom,
+                              adresse: f.adresse,
+                              tel: f.tel,
+                              archive: false,
+                            });
+                            await onRefresh();
+                          }}
+                          className="inline-flex items-center gap-1 rounded border border-[#5E7B3A] px-2.5 py-1 text-xs font-semibold text-[#3D5223]"
+                        >
+                          Désarchiver
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const r = await archiveOrDeleteFournisseurAction(
+                              f.id_fournisseur
+                            );
+                            if (r.message) setMsg(r.message);
+                            await onRefresh();
+                          }}
+                          className="inline-flex items-center gap-1 rounded border border-[#C8553D] px-2.5 py-1 text-xs font-semibold text-[#9B3925]"
+                        >
+                          <Archive className="h-3.5 w-3.5" />{" "}
+                          {count > 0 ? "Archiver" : "Supprimer"}
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );
@@ -1217,8 +1581,12 @@ export function TypesEntrepotsView({
 }) {
   const [tab, setTab] = useState<"TYPES" | "ENTREPOTS">("TYPES");
   const [libelle, setLibelle] = useState("");
+  const [editingType, setEditingType] = useState<TypeVelo | null>(null);
+
   const [entNom, setEntNom] = useState("");
   const [entAdr, setEntAdr] = useState("");
+  const [editingEnt, setEditingEnt] = useState<Entrepot | null>(null);
+
   const [err, setErr] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<TypeVelo | null>(null);
 
@@ -1257,26 +1625,48 @@ export function TypesEntrepotsView({
             onSubmit={async (e) => {
               e.preventDefault();
               setErr(null);
-              const r = await createTypeVeloAction(libelle);
-              if (!r.ok) setErr(r.error ?? "Erreur");
-              else {
-                setLibelle("");
-                await onRefresh();
+              if (editingType) {
+                const r = await updateTypeVeloAction(editingType.id_type, libelle);
+                if (!r.ok) {
+                  setErr(r.error ?? "Erreur");
+                  return;
+                }
+                setEditingType(null);
+              } else {
+                const r = await createTypeVeloAction(libelle);
+                if (!r.ok) {
+                  setErr(r.error ?? "Erreur");
+                  return;
+                }
               }
+              setLibelle("");
+              await onRefresh();
             }}
-            className="flex gap-2"
+            className="flex flex-wrap gap-2"
           >
             <input
               type="text"
-              placeholder="Nouveau type (ex. Cargo)"
+              placeholder="Libellé du type (ex. Cargo)"
               value={libelle}
               onChange={(e) => setLibelle(e.target.value)}
               required
               className="rounded border border-[#14232B] bg-[#FFFDF8] px-3 py-2 text-sm"
             />
             <button type="submit" className="btn-sfax-primary px-4 py-2 text-sm">
-              Ajouter
+              {editingType ? "Enregistrer" : "Ajouter"}
             </button>
+            {editingType && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingType(null);
+                  setLibelle("");
+                }}
+                className="btn-sfax-outline px-3 py-2 text-sm"
+              >
+                Annuler
+              </button>
+            )}
           </form>
 
           <div className="card-sfax-flat divide-y divide-[#E3D9C6]">
@@ -1288,18 +1678,30 @@ export function TypesEntrepotsView({
                   className="flex items-center justify-between p-4"
                 >
                   <div>
-                    <span className="font-semibold">{t.libelle}</span>
-                    <span className="ml-3 font-mono-sfax text-xs text-[#0E5A6B]">
+                    <span className="text-base font-semibold">{t.libelle}</span>
+                    <span className="ml-3 font-mono-sfax text-sm text-[#0E5A6B]">
                       {count} vélo(s)
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmDelete(t)}
-                    className="rounded border border-[#C8553D] px-2.5 py-1 text-xs text-[#9B3925]"
-                  >
-                    Supprimer
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingType(t);
+                        setLibelle(t.libelle);
+                      }}
+                      className="rounded border border-[#14232B] bg-[#F6F1E7] px-3 py-1 text-xs font-semibold"
+                    >
+                      Modifier
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDelete(t)}
+                      className="rounded border border-[#C8553D] px-3 py-1 text-xs font-semibold text-[#9B3925]"
+                    >
+                      Supprimer
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -1311,13 +1713,27 @@ export function TypesEntrepotsView({
             onSubmit={async (e) => {
               e.preventDefault();
               setErr(null);
-              const r = await createEntrepotAction(entNom, entAdr);
-              if (!r.ok) setErr(r.error ?? "Erreur");
-              else {
-                setEntNom("");
-                setEntAdr("");
-                await onRefresh();
+              if (editingEnt) {
+                const r = await updateEntrepotAction(
+                  editingEnt.id_entrepot,
+                  entNom,
+                  entAdr
+                );
+                if (!r.ok) {
+                  setErr(r.error ?? "Erreur");
+                  return;
+                }
+                setEditingEnt(null);
+              } else {
+                const r = await createEntrepotAction(entNom, entAdr);
+                if (!r.ok) {
+                  setErr(r.error ?? "Erreur");
+                  return;
+                }
               }
+              setEntNom("");
+              setEntAdr("");
+              await onRefresh();
             }}
             className="flex flex-wrap gap-2"
           >
@@ -1338,19 +1754,61 @@ export function TypesEntrepotsView({
               className="flex-1 rounded border border-[#14232B] bg-[#FFFDF8] px-3 py-2 text-sm"
             />
             <button type="submit" className="btn-sfax-primary px-4 py-2 text-sm">
-              Ajouter
+              {editingEnt ? "Enregistrer" : "Ajouter"}
             </button>
+            {editingEnt && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingEnt(null);
+                  setEntNom("");
+                  setEntAdr("");
+                }}
+                className="btn-sfax-outline px-3 py-2 text-sm"
+              >
+                Annuler
+              </button>
+            )}
           </form>
 
           <div className="card-sfax-flat divide-y divide-[#E3D9C6]">
             {entrepots.map((e) => (
-              <div key={e.id_entrepot} className="p-4">
-                <p className="font-semibold">{e.nom}</p>
-                <p className="text-xs text-[#14232B]/70">{e.adresse}</p>
-                <p className="mt-1 font-mono-sfax text-xs text-[#0E5A6B]">
-                  {stations.filter((s) => s.id_entrepot === e.id_entrepot).length}{" "}
-                  station(s) rattachée(s)
-                </p>
+              <div
+                key={e.id_entrepot}
+                className="flex flex-wrap items-center justify-between gap-4 p-4"
+              >
+                <div>
+                  <p className="text-base font-semibold">{e.nom}</p>
+                  <p className="text-sm text-[#14232B]/70">{e.adresse}</p>
+                  <p className="mt-1 font-mono-sfax text-xs text-[#0E5A6B]">
+                    {stations.filter((s) => s.id_entrepot === e.id_entrepot).length}{" "}
+                    station(s) rattachée(s)
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingEnt(e);
+                      setEntNom(e.nom);
+                      setEntAdr(e.adresse);
+                    }}
+                    className="rounded border border-[#14232B] bg-[#F6F1E7] px-3 py-1 text-xs font-semibold"
+                  >
+                    Modifier
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const r = await deleteEntrepotAction(e.id_entrepot);
+                      if (!r.ok && r.error) setErr(r.error);
+                      await onRefresh();
+                    }}
+                    className="rounded border border-[#C8553D] px-3 py-1 text-xs font-semibold text-[#9B3925]"
+                  >
+                    Supprimer
+                  </button>
+                </div>
               </div>
             ))}
           </div>

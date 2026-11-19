@@ -61,6 +61,9 @@ export interface Fournisseur {
 
 export interface Camion {
   immatriculation: string;
+  modele: string;
+  capacite: number;
+  kilometrage: number;
   disponible: boolean;
   id_entrepot: number | null;
   created_at: string;
