@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import type { RolePersonnel } from "@/lib/supabase/types";
+import { getSupabaseAdmin } from "@/lib/supabase/server";
 
 export interface StaffSession {
   matricule: number;
@@ -60,7 +61,31 @@ export async function getSession(): Promise<StaffSession | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(COOKIE_NAME)?.value;
   if (!token) return null;
-  return verifySessionToken(token);
+  const session = await verifySessionToken(token);
+  if (!session) return null;
+
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data: person, error } = await supabase
+      .from("personnel")
+      .select("matricule, nom, prenom, role, specialite, actif")
+      .eq("matricule", session.matricule)
+      .maybeSingle();
+
+    if (error || !person || !person.actif) {
+      return null;
+    }
+
+    return {
+      matricule: person.matricule,
+      nom: person.nom,
+      prenom: person.prenom,
+      role: person.role,
+      specialite: person.specialite,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function setSessionCookie(session: StaffSession): Promise<void> {
