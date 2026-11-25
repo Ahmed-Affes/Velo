@@ -212,7 +212,12 @@ export function PlanifierReparationView({
       )}
 
       <div className="grid gap-3 md:grid-cols-2">
-        {techs.map((t) => {
+        {techs.length === 0 ? (
+          <p className="md:col-span-2 rounded-[6px] border border-[#E3D9C6] bg-[#F6F1E7] p-4 text-sm text-[#14232B]/75">
+            Aucun technicien actif disponible. Ajoutez un technicien dans Équipe → Personnel.
+          </p>
+        ) : (
+        techs.map((t) => {
           const load = reparations.filter(
             (r) =>
               r.matricule_technicien === t.matricule && r.statut !== "TERMINEE"
@@ -237,7 +242,8 @@ export function PlanifierReparationView({
               </p>
             </button>
           );
-        })}
+        })
+        )}
       </div>
 
       <div>
@@ -302,7 +308,12 @@ export function ReparationsView({
               <h3 className="font-mono-sfax text-sm font-bold uppercase text-[#0E5A6B]">
                 {col} ({items.length})
               </h3>
-              {items.map((rep) => {
+              {items.length === 0 ? (
+                <p className="py-6 text-center text-sm text-[#14232B]/60">
+                  Aucune réparation.
+                </p>
+              ) : (
+              items.map((rep) => {
                 const rec = reclamations.find(
                   (x) => x.id_reclamation === rep.id_reclamation
                 );
@@ -346,7 +357,8 @@ export function ReparationsView({
                     )}
                   </div>
                 );
-              })}
+              })
+              )}
             </div>
           );
         })}
@@ -507,7 +519,14 @@ export function ItinerairesView({
             </button>
           </div>
 
-          {etapes.map((et, idx) => (
+          {etapes.length === 0 ? (
+            <p className="rounded border border-[#E3D9C6] bg-[#F6F1E7] p-4 text-sm text-[#14232B]/70">
+              {stations.length === 0
+                ? "Aucune station enregistrée. Créez d'abord des stations."
+                : "Aucune étape ajoutée."}
+            </p>
+          ) : (
+          etapes.map((et, idx) => (
             <div
               key={idx}
               className="flex flex-wrap items-center gap-2 rounded border border-[#14232B] bg-[#F6F1E7] p-3"
@@ -566,7 +585,8 @@ export function ItinerairesView({
                 <Trash2 className="h-4 w-4" />
               </button>
             </div>
-          ))}
+          ))
+          )}
 
           <div
             className={`rounded p-3 font-mono-sfax text-sm font-semibold ${
@@ -585,6 +605,9 @@ export function ItinerairesView({
               onChange={(e) => setTechMat(Number(e.target.value))}
               className="rounded border border-[#14232B] bg-[#F6F1E7] px-3 py-2 text-sm"
             >
+              {personnel.filter((p) => p.role === "TECHNICIEN" && p.actif).length === 0 && (
+                <option value={0}>Aucun technicien actif</option>
+              )}
               {personnel
                 .filter((p) => p.role === "TECHNICIEN" && p.actif)
                 .map((p) => (
@@ -598,6 +621,9 @@ export function ItinerairesView({
               onChange={(e) => setCamionImm(e.target.value)}
               className="rounded border border-[#14232B] bg-[#F6F1E7] px-3 py-2 font-mono-sfax text-sm"
             >
+              {camions.length === 0 && (
+                <option value="">Aucun camion enregistré</option>
+              )}
               {camions.map((c) => (
                 <option
                   key={c.immatriculation}
@@ -663,7 +689,12 @@ export function ItinerairesView({
               Simulation après exécution
             </h4>
             <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-              {Array.from(simStations.values()).map((st) => {
+              {simStations.size === 0 ? (
+                <p className="col-span-2 text-sm text-[#14232B]/70">
+                  Aucune station à simuler.
+                </p>
+              ) : (
+              Array.from(simStations.values()).map((st) => {
                 const orig = stations.find(
                   (o) => o.id_station === st.id_station
                 );
@@ -685,7 +716,8 @@ export function ItinerairesView({
                     </p>
                   </div>
                 );
-              })}
+              })
+              )}
             </div>
           </div>
         </div>
@@ -755,6 +787,11 @@ export function OrdresMissionView({
       )}
 
       <div className="card-sfax-flat overflow-x-auto">
+        {ordresMission.length === 0 ? (
+          <p className="p-8 text-center text-sm text-[#14232B]/70">
+            Aucun ordre de mission émis pour le moment.
+          </p>
+        ) : (
         <table className="w-full text-left text-base">
           <thead className="border-b-[1.5px] border-[#14232B] bg-[#F6F1E7] font-mono-sfax text-xs uppercase">
             <tr>
@@ -837,6 +874,7 @@ export function OrdresMissionView({
             })}
           </tbody>
         </table>
+        )}
       </div>
 
       {/* Modale Détails d'un Ordre de Mission */}
@@ -1207,7 +1245,12 @@ export function CamionsView({
       </form>
 
       <div className="grid gap-4 md:grid-cols-2">
-        {camions.map((c) => {
+        {camions.length === 0 ? (
+          <div className="card-sfax-flat p-8 text-center text-sm text-[#14232B]/70 md:col-span-2">
+            Aucun camion enregistré pour le moment.
+          </div>
+        ) : (
+        camions.map((c) => {
           const aboardBikes = velos.filter(
             (v) => v.immatriculation_camion === c.immatriculation
           );
@@ -1284,7 +1327,8 @@ export function CamionsView({
               </div>
             </div>
           );
-        })}
+        })
+        )}
       </div>
     </div>
   );

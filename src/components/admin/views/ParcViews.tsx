@@ -377,7 +377,14 @@ export function StationsView({
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="card-sfax-flat overflow-x-auto lg:col-span-2">
-          <table className="w-full text-left text-base">
+          {filteredStations.length === 0 ? (
+            <p className="p-8 text-center text-sm text-[#14232B]/70">
+              {stations.length === 0
+                ? "Aucune station enregistrée pour le moment."
+                : "Aucune station ne correspond aux filtres."}
+            </p>
+          ) : (
+            <table className="w-full text-left text-base">
             <thead className="border-b-[1.5px] border-[#14232B] bg-[#F6F1E7] font-mono-sfax text-xs uppercase">
               <tr>
                 <th className="p-3.5">Station</th>
@@ -440,6 +447,7 @@ export function StationsView({
               ))}
             </tbody>
           </table>
+          )}
         </div>
 
         <SfaxMap
@@ -857,6 +865,13 @@ export function ParcVelosView({
       )}
 
       <div className="card-sfax-flat overflow-x-auto">
+        {filtered.length === 0 ? (
+          <p className="p-8 text-center text-sm text-[#14232B]/70">
+            {velos.length === 0
+              ? "Aucun vélo enregistré dans le parc."
+              : "Aucun vélo ne correspond aux filtres."}
+          </p>
+        ) : (
         <table className="w-full text-left text-base">
           <thead className="border-b-[1.5px] border-[#14232B] bg-[#F6F1E7] font-mono-sfax text-xs uppercase">
             <tr>
@@ -950,6 +965,7 @@ export function ParcVelosView({
             ))}
           </tbody>
         </table>
+        )}
       </div>
 
       {editingBike && (
@@ -1814,6 +1830,11 @@ export function FournisseursView({
       </form>
 
       <div className="card-sfax-flat overflow-x-auto">
+        {fournisseurs.length === 0 ? (
+          <p className="p-8 text-center text-sm text-[#14232B]/70">
+            Aucun fournisseur enregistré pour le moment.
+          </p>
+        ) : (
         <table className="w-full text-left text-base">
           <thead className="border-b-[1.5px] border-[#14232B] bg-[#F6F1E7] font-mono-sfax text-xs uppercase">
             <tr>
@@ -1886,6 +1907,7 @@ export function FournisseursView({
             })}
           </tbody>
         </table>
+        )}
       </div>
     </div>
   );
@@ -1995,7 +2017,12 @@ export function TypesEntrepotsView({
           </form>
 
           <div className="card-sfax-flat divide-y divide-[#E3D9C6]">
-            {types.map((t) => {
+            {types.length === 0 ? (
+              <p className="p-8 text-center text-sm text-[#14232B]/70">
+                Aucun type de vélo enregistré pour le moment.
+              </p>
+            ) : (
+            types.map((t) => {
               const count = velos.filter((v) => v.id_type === t.id_type).length;
               return (
                 <div
@@ -2029,7 +2056,8 @@ export function TypesEntrepotsView({
                   </div>
                 </div>
               );
-            })}
+            })
+            )}
           </div>
         </div>
       ) : (
@@ -2097,7 +2125,12 @@ export function TypesEntrepotsView({
           </form>
 
           <div className="card-sfax-flat divide-y divide-[#E3D9C6]">
-            {entrepots.map((e) => (
+            {entrepots.length === 0 ? (
+              <p className="p-8 text-center text-sm text-[#14232B]/70">
+                Aucun entrepôt enregistré pour le moment.
+              </p>
+            ) : (
+            entrepots.map((e) => (
               <div
                 key={e.id_entrepot}
                 className="flex flex-wrap items-center justify-between gap-4 p-4"
@@ -2135,7 +2168,8 @@ export function TypesEntrepotsView({
                   </button>
                 </div>
               </div>
-            ))}
+            ))
+            )}
           </div>
         </div>
       )}

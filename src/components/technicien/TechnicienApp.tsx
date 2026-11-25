@@ -639,22 +639,28 @@ export function TechnicienApp({
                   <p className="mb-2 text-xs font-semibold uppercase text-[#0E5A6B]">
                     Sélection rapide dans le parc :
                   </p>
-                  <div className="flex flex-wrap gap-2">
-                    {data.velos.slice(0, 12).map((v) => (
-                      <button
-                        key={v.num_serie}
-                        type="button"
-                        onClick={() => {
-                          setScanSerial(v.num_serie);
-                          setSelectedBike(v);
-                          setShowFaultForm(false);
-                        }}
-                        className="rounded border border-[#14232B] bg-[#F6F1E7] px-2.5 py-1.5 font-mono-sfax text-xs font-semibold hover:bg-[#E3D9C6]"
-                      >
-                        {v.num_serie}
-                      </button>
-                    ))}
-                  </div>
+                  {data.velos.length === 0 ? (
+                    <p className="text-sm text-[#14232B]/70">
+                      Aucun vélo enregistré dans le parc.
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {data.velos.slice(0, 12).map((v) => (
+                        <button
+                          key={v.num_serie}
+                          type="button"
+                          onClick={() => {
+                            setScanSerial(v.num_serie);
+                            setSelectedBike(v);
+                            setShowFaultForm(false);
+                          }}
+                          className="rounded border border-[#14232B] bg-[#F6F1E7] px-2.5 py-1.5 font-mono-sfax text-xs font-semibold hover:bg-[#E3D9C6]"
+                        >
+                          {v.num_serie}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 

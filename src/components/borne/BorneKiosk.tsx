@@ -992,14 +992,22 @@ export function BorneKiosk({
             {visibleBikes.length === 0 ? (
               <div className="card-sfax p-8 text-center">
                 <p className="text-2xl font-bold">
-                  Aucun vélo disponible pour ce filtre
+                  {bikes.length - hiddenFaultySerials.length === 0
+                    ? "Aucun vélo disponible à cette station"
+                    : "Aucun vélo disponible pour ce filtre"}
                 </p>
                 <button
                   type="button"
-                  onClick={() => setTypeFilter("ALL")}
+                  onClick={() =>
+                    bikes.length - hiddenFaultySerials.length === 0
+                      ? void resetToHome()
+                      : setTypeFilter("ALL")
+                  }
                   className="btn-sfax-primary mt-4 min-h-[56px] px-6 text-lg"
                 >
-                  Voir tous les types
+                  {bikes.length - hiddenFaultySerials.length === 0
+                    ? "Retour à l'accueil"
+                    : "Voir tous les types"}
                 </button>
               </div>
             ) : (

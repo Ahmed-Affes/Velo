@@ -56,6 +56,20 @@ export function SfaxMap({
           Mer
         </text>
 
+        {stations.length === 0 && (
+          <text
+            x="44"
+            y="45"
+            textAnchor="middle"
+            fontSize="3.4"
+            fill="#14232B"
+            fillOpacity="0.55"
+            fontFamily="monospace"
+          >
+            Aucune station configurée
+          </text>
+        )}
+
         {/* Lignes de réseau de base */}
         {stations.length > 1 &&
           stations.slice(0, -1).map((s, idx) => {

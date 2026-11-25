@@ -203,19 +203,25 @@ export function TableauDeBordView({
             Total observé : {locations.length}
           </span>
         </div>
-        <div className="flex h-32 items-end gap-2">
-          {hourlyCounts.map((item) => (
-            <div key={item.hour} className="flex flex-1 flex-col items-center gap-1">
-              <div
-                className="w-full rounded-t border border-[#14232B] bg-[#0E5A6B]"
-                style={{
-                  height: `${Math.max(8, (item.count / maxHour) * 100)}%`,
-                }}
-              />
-              <span className="font-mono-sfax text-[11px]">{item.hour}</span>
-            </div>
-          ))}
-        </div>
+        {locations.length === 0 ? (
+          <p className="py-8 text-center text-sm text-[#14232B]/65">
+            Aucune location enregistrée pour le moment.
+          </p>
+        ) : (
+          <div className="flex h-32 items-end gap-2">
+            {hourlyCounts.map((item) => (
+              <div key={item.hour} className="flex flex-1 flex-col items-center gap-1">
+                <div
+                  className="w-full rounded-t border border-[#14232B] bg-[#0E5A6B]"
+                  style={{
+                    height: `${Math.max(8, (item.count / maxHour) * 100)}%`,
+                  }}
+                />
+                <span className="font-mono-sfax text-[11px]">{item.hour}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -270,7 +276,12 @@ export function MouvementsView({
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-3 lg:col-span-2">
-          {stations.map((s) => {
+          {stations.length === 0 ? (
+            <div className="card-sfax-flat p-8 text-center text-sm text-[#14232B]/70">
+              Aucune station enregistrée pour le moment.
+            </div>
+          ) : (
+            stations.map((s) => {
             const ratio = s.nb_velos_actuel / Math.max(1, s.capacite);
             const tag =
               ratio <= 0.3 ? "Déficit" : ratio >= 0.7 ? "Surplus" : "Équilibrée";
@@ -309,7 +320,8 @@ export function MouvementsView({
                 </span>
               </div>
             );
-          })}
+          })
+          )}
         </div>
 
         {/* Suggestions de transferts */}
@@ -356,40 +368,46 @@ export function MouvementsView({
 
       {/* Dernières locations */}
       <div className="card-sfax-flat overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b-[1.5px] border-[#14232B] bg-[#F6F1E7] font-mono-sfax text-xs uppercase">
-            <tr>
-              <th className="p-3">ID</th>
-              <th className="p-3">Vélo</th>
-              <th className="p-3">Départ</th>
-              <th className="p-3">Arrivée</th>
-              <th className="p-3">Début</th>
-              <th className="p-3">Statut</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#E3D9C6]">
-            {locations.slice(0, 8).map((l) => (
-              <tr key={l.id_location}>
-                <td className="p-3 font-mono-sfax">#{l.id_location}</td>
-                <td className="p-3 font-mono-sfax font-semibold">{l.num_serie}</td>
-                <td className="p-3">
-                  {stations.find((s) => s.id_station === l.id_station_depart)?.nom}
-                </td>
-                <td className="p-3">
-                  {l.id_station_arrivee_reelle
-                    ? stations.find((s) => s.id_station === l.id_station_arrivee_reelle)?.nom
-                    : "—"}
-                </td>
-                <td className="p-3 font-mono-sfax text-xs">
-                  {formatDateTime(l.date_heure_debut)}
-                </td>
-                <td className="p-3 font-mono-sfax text-xs">
-                  {l.date_heure_fin ? "Clôturée" : "En cours"}
-                </td>
+        {locations.length === 0 ? (
+          <p className="p-8 text-center text-sm text-[#14232B]/70">
+            Aucune location enregistrée pour le moment.
+          </p>
+        ) : (
+          <table className="w-full text-left text-sm">
+            <thead className="border-b-[1.5px] border-[#14232B] bg-[#F6F1E7] font-mono-sfax text-xs uppercase">
+              <tr>
+                <th className="p-3">ID</th>
+                <th className="p-3">Vélo</th>
+                <th className="p-3">Départ</th>
+                <th className="p-3">Arrivée</th>
+                <th className="p-3">Début</th>
+                <th className="p-3">Statut</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-[#E3D9C6]">
+              {locations.slice(0, 8).map((l) => (
+                <tr key={l.id_location}>
+                  <td className="p-3 font-mono-sfax">#{l.id_location}</td>
+                  <td className="p-3 font-mono-sfax font-semibold">{l.num_serie}</td>
+                  <td className="p-3">
+                    {stations.find((s) => s.id_station === l.id_station_depart)?.nom}
+                  </td>
+                  <td className="p-3">
+                    {l.id_station_arrivee_reelle
+                      ? stations.find((s) => s.id_station === l.id_station_arrivee_reelle)?.nom
+                      : "—"}
+                  </td>
+                  <td className="p-3 font-mono-sfax text-xs">
+                    {formatDateTime(l.date_heure_debut)}
+                  </td>
+                  <td className="p-3 font-mono-sfax text-xs">
+                    {l.date_heure_fin ? "Clôturée" : "En cours"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

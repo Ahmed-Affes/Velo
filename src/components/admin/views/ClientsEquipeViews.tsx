@@ -278,6 +278,13 @@ export function AbonnesView({
       )}
 
       {tab === "ABONNES" ? (
+        abonnes.length === 0 ? (
+          <div className="card-sfax-flat p-8 text-center text-base text-[#14232B]/70">
+            {utilisateurs.some((u) => u.type_utilisateur === "ABONNE")
+              ? "Aucun abonné ne correspond à la recherche."
+              : "Aucun abonné enregistré pour le moment."}
+          </div>
+        ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {abonnes.map((u) => {
             const carte = cartesAdhesion.find(
@@ -391,6 +398,7 @@ export function AbonnesView({
             );
           })}
         </div>
+        )
       ) : (
         <div className="card-sfax-flat overflow-x-auto">
           {filteredOccasionnels.length === 0 ? (
@@ -499,6 +507,11 @@ export function LocationsView({
 
       {tab === "GARANTIES" ? (
         <div className="card-sfax-flat overflow-x-auto">
+          {garanties.length === 0 ? (
+            <p className="p-8 text-center text-base text-[#14232B]/70">
+              Aucune garantie en attente de restitution.
+            </p>
+          ) : (
           <table className="w-full text-left text-base">
             <thead className="border-b-[1.5px] border-[#14232B] bg-[#F6F1E7] font-mono-sfax text-xs uppercase">
               <tr>
@@ -532,9 +545,17 @@ export function LocationsView({
               })}
             </tbody>
           </table>
+          )}
         </div>
       ) : (
         <div className="card-sfax-flat overflow-x-auto">
+          {list.length === 0 ? (
+            <p className="p-8 text-center text-base text-[#14232B]/70">
+              {tab === "EN_COURS"
+                ? "Aucune location en cours pour le moment."
+                : "Aucune location dans l'historique."}
+            </p>
+          ) : (
           <table className="w-full text-left text-base">
             <thead className="border-b-[1.5px] border-[#14232B] bg-[#F6F1E7] font-mono-sfax text-xs uppercase">
               <tr>
@@ -596,6 +617,7 @@ export function LocationsView({
               })}
             </tbody>
           </table>
+          )}
         </div>
       )}
     </div>
@@ -854,6 +876,13 @@ export function PersonnelView({
       )}
 
       <div className="card-sfax-flat overflow-x-auto">
+        {list.length === 0 ? (
+          <p className="p-8 text-center text-base text-[#14232B]/70">
+            {tab === "TECHNICIEN"
+              ? "Aucun technicien enregistré pour le moment."
+              : "Aucun responsable enregistré pour le moment."}
+          </p>
+        ) : (
         <table className="w-full text-left text-base">
           <thead className="border-b-[1.5px] border-[#14232B] bg-[#F6F1E7] font-mono-sfax text-xs uppercase">
             <tr>
@@ -921,6 +950,7 @@ export function PersonnelView({
             ))}
           </tbody>
         </table>
+        )}
       </div>
 
       <ConfirmModal
