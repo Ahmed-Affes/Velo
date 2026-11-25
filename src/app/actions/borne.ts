@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { calcOccasionnelAmounts } from "@/lib/format";
+import { broadcastVelosfEvent } from "@/lib/realtime-server";
 
 export async function getBorneBootstrapAction(stationId?: number) {
   const supabase = getSupabaseAdmin();
@@ -188,6 +189,16 @@ export async function demarrerLocationAbonneAction(
     return { ok: false, error: error.message };
   }
 
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    targetStationId: idStation,
+    severity: "info",
+    kind: "LOCATION_DEMARREE",
+    title: "Nouvelle location (Abonné)",
+    message: `Le vélo ${numSerie} a été débloqué (carte #${numCarte}).`,
+    route: "R17",
+  });
+
   return {
     ok: true,
     idLocation: data as number,
@@ -236,13 +247,13 @@ export async function signalerVeloMauvaisEtatBorneAction(
     return { ok: false, error: restErr.message };
   }
 
+  const diagnostic =
+    motifs.length > 0
+      ? `Signalement usager à la borne : ${motifs.join(", ")}`
+      : "Signalement usager à la borne : vélo en mauvais état";
+
   const techMat = await findDefaultTechnicianMatricule(supabase);
   if (techMat !== null) {
-    const diagnostic =
-      motifs.length > 0
-        ? `Signalement usager à la borne : ${motifs.join(", ")}`
-        : "Signalement usager à la borne : vélo en mauvais état";
-
     await supabase.from("reclamations").insert({
       num_serie: numSerie,
       matricule_technicien: techMat,
@@ -250,6 +261,16 @@ export async function signalerVeloMauvaisEtatBorneAction(
       traitee: false,
     });
   }
+
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    targetStationId: idStation,
+    severity: "alert",
+    kind: "RECLAMATION_CREATED",
+    title: `Vélo en panne signalé à la borne (${numSerie})`,
+    message: diagnostic,
+    route: "R9",
+  });
 
   return { ok: true };
 }
@@ -366,6 +387,17 @@ export async function demarrerLocationOccasionnelAction(
   }
 
   const row = Array.isArray(data) ? data[0] : data;
+
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    targetStationId: input.idStationDepart,
+    severity: "info",
+    kind: "LOCATION_DEMARREE",
+    title: "Nouvelle location (Occasionnel)",
+    message: `Vélo ${input.numSerie} loué — carte courte durée #${row?.num_carte}.`,
+    route: "R17",
+  });
+
   return {
     ok: true,
     idLocation: row?.id_location as number,
@@ -468,17 +500,32 @@ export async function restituerVeloAction(input: {
     return { ok: false, error: error.message };
   }
 
+  const serialUpper = input.numSerie.toUpperCase();
   if (input.mauvaisEtat) {
     const techMat = await findDefaultTechnicianMatricule(supabase);
     if (techMat !== null) {
       await supabase.from("reclamations").insert({
-        num_serie: input.numSerie.toUpperCase(),
+        num_serie: serialUpper,
         matricule_technicien: techMat,
         diagnostic: "Vélo restitué en mauvais état par l'usager.",
         traitee: false,
       });
     }
   }
+
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    targetStationId: input.idStationArrivee,
+    severity: input.mauvaisEtat ? "alert" : "success",
+    kind: input.mauvaisEtat ? "RECLAMATION_CREATED" : "LOCATION_TERMINEE",
+    title: input.mauvaisEtat
+      ? `Vélo restitué en mauvais état (${serialUpper})`
+      : `Vélo restitué (${serialUpper})`,
+    message: input.mauvaisEtat
+      ? `Restitué à ${station.nom} avec signalement de panne.`
+      : `Restitué à ${station.nom} (${elapsedMin} min).`,
+    route: input.mauvaisEtat ? "R9" : "R17",
+  });
 
   const differentStationWarning =
     loc.id_station_destination_prevue &&

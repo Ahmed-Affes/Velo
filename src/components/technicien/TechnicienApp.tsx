@@ -27,6 +27,12 @@ import type {
   EtapeItineraire,
 } from "@/lib/supabase/types";
 import { StatusChip } from "@/components/ui/StatusChip";
+import {
+  NotificationBell,
+  LiveToastBanner,
+  type AppNotificationItem,
+} from "@/components/ui/NotificationBell";
+import type { VelosfRealtimeEvent } from "@/lib/realtime-types";
 import { formatDate } from "@/lib/format";
 import { useRealtimeRefresh } from "@/hooks/useRealtimeRefresh";
 import {
@@ -93,6 +99,14 @@ export function TechnicienApp({
   const [offline, setOffline] = useState(false);
   const [pendingQueue, setPendingQueue] = useState<number>(0);
   const [toast, setToast] = useState<string | null>(null);
+  const [liveNotifs, setLiveNotifs] = useState<AppNotificationItem[]>([]);
+  const [readIds, setReadIds] = useState<string[]>([]);
+  const [liveToast, setLiveToast] = useState<{
+    severity: VelosfRealtimeEvent["severity"];
+    title: string;
+    message: string;
+    route?: string;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
 
   // Sélection multi-missions
@@ -126,7 +140,56 @@ export function TechnicienApp({
     setData(fresh as typeof initialData);
   }, []);
 
-  useRealtimeRefresh(refresh, "velosf-tech-realtime", 4000);
+  const handleRealtimeEvent = useCallback(
+    (ev: VelosfRealtimeEvent) => {
+      const isForMe =
+        (ev.audience === "TECHNICIEN" &&
+          (!ev.targetMatricule || ev.targetMatricule === data.session.matricule)) ||
+        (ev.audience === "ALL" && ev.kind === "RECLAMATION_CREATED");
+
+      if (!isForMe) return;
+
+      const targetTab =
+        ev.route === "T3" || ev.route === "T4" ? ev.route : undefined;
+
+      setLiveNotifs((prev) => {
+        if (prev.some((x) => x.id === ev.id)) return prev;
+        return [
+          {
+            id: ev.id,
+            at: ev.at,
+            severity: ev.severity,
+            title: ev.title,
+            message: ev.message,
+            route: targetTab,
+            read: false,
+          },
+          ...prev,
+        ].slice(0, 25);
+      });
+      setLiveToast({
+        severity: ev.severity,
+        title: ev.title,
+        message: ev.message,
+        route: targetTab,
+      });
+      setTimeout(() => {
+        setLiveToast((curr) =>
+          curr && curr.title === ev.title && curr.message === ev.message
+            ? null
+            : curr
+        );
+      }, 5500);
+    },
+    [data.session.matricule]
+  );
+
+  useRealtimeRefresh(
+    refresh,
+    "velosf-tech-realtime",
+    8000,
+    handleRealtimeEvent
+  );
 
   function showToastMsg(msg: string) {
     setToast(msg);
@@ -373,6 +436,43 @@ export function TechnicienApp({
     { id: "T4", label: "Mes réparations", Icon: Wrench, badge: plannedTodayReps.length },
   ];
 
+  const derivedTechAlerts: AppNotificationItem[] = [
+    ...data.ordresMission
+      .filter((o) => o.statut === "NON_DEMARRE")
+      .map((o) => ({
+        id: `mission-${o.id_ordre}`,
+        at: o.date_mission,
+        severity: "info" as const,
+        title: `Mission #${o.id_ordre} à démarrer`,
+        message: `Camion ${o.immatriculation_camion} — prévue le ${formatDate(o.date_mission)}.`,
+        route: "T3",
+        read: readIds.includes(`mission-${o.id_ordre}`),
+        persistent: true,
+      })),
+    ...data.reparations
+      .filter((r) => r.statut === "PLANIFIEE")
+      .map((r) => {
+        const rec = data.reclamations.find(
+          (x) => x.id_reclamation === r.id_reclamation
+        );
+        return {
+          id: `rep-${r.id_reparation}`,
+          at: r.date_planifiee,
+          severity: "warning" as const,
+          title: `Réparation planifiée (${rec?.num_serie ?? `#${r.id_reparation}`})`,
+          message: `Prévue le ${formatDate(r.date_planifiee)}.`,
+          route: "T4",
+          read: readIds.includes(`rep-${r.id_reparation}`),
+          persistent: true,
+        };
+      }),
+  ];
+
+  const allTechNotifications: AppNotificationItem[] = [
+    ...liveNotifs.map((n) => ({ ...n, read: n.read || readIds.includes(n.id) })),
+    ...derivedTechAlerts,
+  ];
+
   return (
     <div className="flex min-h-screen bg-[#F6F1E7]">
       {/* Barre latérale Desktop */}
@@ -444,6 +544,20 @@ export function TechnicienApp({
               <span className="h-2 w-2 animate-pulse rounded-full bg-[#5E7B3A]" />
               Temps réel
             </span>
+            <NotificationBell
+              items={allTechNotifications}
+              onMarkRead={(id) =>
+                setReadIds((prev) => (prev.includes(id) ? prev : [...prev, id]))
+              }
+              onMarkAllRead={() =>
+                setReadIds(allTechNotifications.map((n) => n.id))
+              }
+              onSelectRoute={(r) => {
+                if (r === "T1" || r === "T2" || r === "T3" || r === "T4") {
+                  setTab(r);
+                }
+              }}
+            />
             {pendingQueue > 0 && !offline && (
               <button
                 type="button"
@@ -1134,6 +1248,15 @@ export function TechnicienApp({
           );
         })}
       </nav>
+      <LiveToastBanner
+        toast={liveToast}
+        onDismiss={() => setLiveToast(null)}
+        onClick={(r) => {
+          if (r === "T1" || r === "T2" || r === "T3" || r === "T4") {
+            setTab(r);
+          }
+        }}
+      />
     </div>
   );
 }

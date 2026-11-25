@@ -2,6 +2,7 @@
 
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
+import { broadcastVelosfEvent } from "@/lib/realtime-server";
 
 export async function getTechnicienBootstrapAction() {
   const session = await requireRole(["TECHNICIEN", "RESPONSABLE"]);
@@ -120,6 +121,27 @@ export async function enregistrerControleJournalierAction(input: {
     );
 
   if (ctrlErr) return { ok: false, error: ctrlErr.message };
+
+  if (!input.bonEtat) {
+    await broadcastVelosfEvent({
+      audience: "ALL",
+      severity: "alert",
+      kind: "RECLAMATION_CREATED",
+      title: `Nouvelle réclamation #${idReclamation} (${serial})`,
+      message: `${session.prenom} ${session.nom} : ${input.diagnostic?.trim() ?? "Panne signalée"}`,
+      route: "R9",
+    });
+  } else {
+    await broadcastVelosfEvent({
+      audience: "RESPONSABLE",
+      severity: "info",
+      kind: "SYSTEM_SYNC",
+      title: `Contrôle journalier (${serial})`,
+      message: `Vélo ${serial} contrôlé en bon état par ${session.prenom} ${session.nom}.`,
+      route: "R4",
+    });
+  }
+
   return { ok: true, idReclamation };
 }
 
@@ -193,6 +215,21 @@ export async function executerEtapeMissionAction(input: {
     })
     .eq("id_etape", input.idEtape);
 
+  const hasDiff = Boolean(input.motifEcart?.trim());
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    targetStationId: etape.id_station,
+    severity: hasDiff ? "warning" : "info",
+    kind: "MISSION_ETAPE_VALIDEE",
+    title: hasDiff
+      ? `Écart sur mission #${input.idOrdre} (étape ${etape.ordre})`
+      : `Étape ${etape.ordre} exécutée (mission #${input.idOrdre})`,
+    message: hasDiff
+      ? `${etape.action} ${input.nbVelosReel}/${etape.nb_velos} vélo(s) — ${input.motifEcart!.trim()}`
+      : `${etape.action} ${input.nbVelosReel} vélo(s) effectuée.`,
+    route: "R14",
+  });
+
   return { ok: true };
 }
 
@@ -257,6 +294,17 @@ export async function recupererVeloEnPanneMissionAction(input: {
     .eq("num_serie", input.numSerie);
 
   if (error) return { ok: false, error: error.message };
+
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    targetStationId: velo.id_station,
+    severity: "info",
+    kind: "MISSION_PANNE_RECUPEREE",
+    title: `Vélo en panne récupéré (${input.numSerie})`,
+    message: `Chargé dans le camion ${ordre.immatriculation_camion} (mission #${input.idOrdre}).`,
+    route: "R4",
+  });
+
   return { ok: true };
 }
 
@@ -297,17 +345,37 @@ export async function dechargerVeloAtelierAction(input: {
     .eq("num_serie", input.numSerie);
 
   if (error) return { ok: false, error: error.message };
+
+  await broadcastVelosfEvent({
+    audience: "RESPONSABLE",
+    severity: "info",
+    kind: "PARC_UPDATED",
+    title: `Vélo déchargé à l'atelier (${input.numSerie})`,
+    message: `Déchargé du camion ${ordre.immatriculation_camion}.`,
+    route: "R4",
+  });
+
   return { ok: true };
 }
 
 export async function cloturerMissionAction(idOrdre: number) {
-  await requireRole(["TECHNICIEN", "RESPONSABLE"]);
+  const session = await requireRole(["TECHNICIEN", "RESPONSABLE"]);
   const supabase = getSupabaseAdmin();
   const { error } = await supabase
     .from("ordres_mission")
     .update({ statut: "TERMINE" })
     .eq("id_ordre", idOrdre);
   if (error) return { ok: false, error: error.message };
+
+  await broadcastVelosfEvent({
+    audience: "RESPONSABLE",
+    severity: "success",
+    kind: "MISSION_CLOTUREE",
+    title: `Mission #${idOrdre} clôturée`,
+    message: `Terminée par ${session.prenom} ${session.nom}.`,
+    route: "R14",
+  });
+
   return { ok: true };
 }
 
@@ -326,6 +394,16 @@ export async function demarrerReparationAction(idReparation: number) {
     .from("reparations")
     .update({ statut: "EN_COURS" })
     .eq("id_reparation", idReparation);
+
+  await broadcastVelosfEvent({
+    audience: "RESPONSABLE",
+    severity: "info",
+    kind: "REPARATION_DEMARREE",
+    title: `Réparation #${idReparation} démarrée`,
+    message: `${session.prenom} ${session.nom} a commencé l'intervention.`,
+    route: "R11",
+  });
+
   return { ok: true };
 }
 
@@ -359,6 +437,16 @@ export async function cloturerReparationAction(input: {
         compte_rendu: input.compteRendu.trim(),
       })
       .eq("id_reparation", input.idReparation);
+
+    await broadcastVelosfEvent({
+      audience: "RESPONSABLE",
+      severity: "warning",
+      kind: "REPARATION_CLOTUREE",
+      title: `Pièces manquantes — Réparation #${input.idReparation}`,
+      message: `${numSerie ?? "Vélo"} : ${input.compteRendu.trim()}`,
+      route: "R11",
+    });
+
     return { ok: true };
   }
 
@@ -379,6 +467,18 @@ export async function cloturerReparationAction(input: {
       })
       .eq("num_serie", numSerie);
   }
+
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    severity: input.outcome === "REPARE" ? "success" : "alert",
+    kind: "REPARATION_CLOTUREE",
+    title:
+      input.outcome === "REPARE"
+        ? `Vélo réparé et remis en service (${numSerie ?? `#${input.idReparation}`})`
+        : `Vélo déclaré irréparable (${numSerie ?? `#${input.idReparation}`})`,
+    message: input.compteRendu.trim(),
+    route: input.outcome === "REPARE" ? "R11" : "R3",
+  });
 
   return { ok: true };
 }

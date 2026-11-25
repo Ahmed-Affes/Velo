@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
+import { broadcastVelosfEvent } from "@/lib/realtime-server";
 import type { MotifReforme, RolePersonnel } from "@/lib/supabase/types";
 
 export async function getAdminBootstrapAction() {
@@ -106,6 +107,14 @@ export async function createStationAction(input: {
     .single();
 
   if (error) return { ok: false, error: error.message };
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    targetStationId: data.id_station,
+    severity: "info",
+    kind: "STATION_UPDATED",
+    title: `Station créée (${data.nom})`,
+    message: `${data.adresse} — capacité ${data.capacite} places.`,
+  });
   return { ok: true, station: data };
 }
 
@@ -148,6 +157,18 @@ export async function updateStationAction(input: {
     })
     .eq("id_station", input.idStation);
   if (error) return { ok: false, error: error.message };
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    targetStationId: input.idStation,
+    severity: input.borne_hors_service || input.lecteur_en_panne ? "warning" : "info",
+    kind: "STATION_UPDATED",
+    title: `Station mise à jour (${input.nom})`,
+    message: input.borne_hors_service
+      ? "Borne signalée hors service."
+      : input.lecteur_en_panne
+      ? "Lecteur optique signalé en panne."
+      : "Paramètres de la station actualisés.",
+  });
   return { ok: true };
 }
 
@@ -174,6 +195,14 @@ export async function updateStationCapacityAction(
     .update({ capacite })
     .eq("id_station", idStation);
   if (error) return { ok: false, error: error.message };
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    targetStationId: idStation,
+    severity: "info",
+    kind: "STATION_UPDATED",
+    title: "Capacité de station modifiée",
+    message: `Nouvelle capacité : ${capacite} places.`,
+  });
   return { ok: true };
 }
 
@@ -198,6 +227,14 @@ export async function deleteStationAction(idStation: number) {
     .delete()
     .eq("id_station", idStation);
   if (error) return { ok: false, error: error.message };
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    targetStationId: idStation,
+    severity: "info",
+    kind: "STATION_UPDATED",
+    title: "Station supprimée",
+    message: `La station #${idStation} a été retirée du réseau.`,
+  });
   return { ok: true };
 }
 
@@ -213,6 +250,13 @@ export async function createEntrepotAction(nom: string, adresse: string) {
     .select()
     .single();
   if (error) return { ok: false, error: error.message };
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    severity: "info",
+    kind: "SYSTEM_SYNC",
+    title: "Entrepôt créé",
+    message: data.nom,
+  });
   return { ok: true, entrepot: data };
 }
 
@@ -231,6 +275,13 @@ export async function updateEntrepotAction(
     .update({ nom: nom.trim(), adresse: adresse.trim() })
     .eq("id_entrepot", idEntrepot);
   if (error) return { ok: false, error: error.message };
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    severity: "info",
+    kind: "SYSTEM_SYNC",
+    title: "Entrepôt mis à jour",
+    message: nom.trim(),
+  });
   return { ok: true };
 }
 
@@ -252,6 +303,13 @@ export async function deleteEntrepotAction(idEntrepot: number) {
     .delete()
     .eq("id_entrepot", idEntrepot);
   if (error) return { ok: false, error: error.message };
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    severity: "info",
+    kind: "SYSTEM_SYNC",
+    title: "Entrepôt supprimé",
+    message: `Entrepôt #${idEntrepot} supprimé.`,
+  });
   return { ok: true };
 }
 
@@ -272,6 +330,13 @@ export async function createTypeVeloAction(libelle: string) {
         : error.message,
     };
   }
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    severity: "info",
+    kind: "SYSTEM_SYNC",
+    title: "Type de vélo créé",
+    message: data.libelle,
+  });
   return { ok: true, type: data };
 }
 
@@ -291,6 +356,13 @@ export async function updateTypeVeloAction(idType: number, libelle: string) {
         : error.message,
     };
   }
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    severity: "info",
+    kind: "SYSTEM_SYNC",
+    title: "Type de vélo modifié",
+    message: libelle.trim(),
+  });
   return { ok: true };
 }
 
@@ -312,6 +384,13 @@ export async function deleteTypeVeloAction(idType: number) {
     .delete()
     .eq("id_type", idType);
   if (error) return { ok: false, error: error.message };
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    severity: "info",
+    kind: "SYSTEM_SYNC",
+    title: "Type de vélo supprimé",
+    message: `Type #${idType} supprimé.`,
+  });
   return { ok: true };
 }
 
@@ -335,6 +414,13 @@ export async function createFournisseurAction(input: {
     .select()
     .single();
   if (error) return { ok: false, error: error.message };
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    severity: "info",
+    kind: "SYSTEM_SYNC",
+    title: "Fournisseur enregistré",
+    message: data.nom,
+  });
   return { ok: true, fournisseur: data };
 }
 
@@ -363,6 +449,13 @@ export async function updateFournisseurAction(input: {
     })
     .eq("id_fournisseur", input.idFournisseur);
   if (error) return { ok: false, error: error.message };
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    severity: "info",
+    kind: "SYSTEM_SYNC",
+    title: "Fournisseur mis à jour",
+    message: input.nom.trim(),
+  });
   return { ok: true };
 }
 
@@ -379,6 +472,13 @@ export async function archiveOrDeleteFournisseurAction(idFournisseur: number) {
       .from("fournisseurs")
       .update({ archive: true })
       .eq("id_fournisseur", idFournisseur);
+    await broadcastVelosfEvent({
+      audience: "ALL",
+      severity: "info",
+      kind: "SYSTEM_SYNC",
+      title: "Fournisseur archivé",
+      message: `Fournisseur #${idFournisseur} archivé.`,
+    });
     return {
       ok: true,
       archived: true,
@@ -391,6 +491,13 @@ export async function archiveOrDeleteFournisseurAction(idFournisseur: number) {
     .delete()
     .eq("id_fournisseur", idFournisseur);
   if (error) return { ok: false, error: error.message };
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    severity: "info",
+    kind: "SYSTEM_SYNC",
+    title: "Fournisseur supprimé",
+    message: `Fournisseur #${idFournisseur} supprimé.`,
+  });
   return { ok: true, archived: false };
 }
 
@@ -478,6 +585,17 @@ export async function acquerirVelosAction(
       .eq("num_serie", input.remplaceNumSerie);
   }
 
+  if (created.length > 0) {
+    await broadcastVelosfEvent({
+      audience: "ALL",
+      targetStationId: input.idStation,
+      severity: "success",
+      kind: "PARC_UPDATED",
+      title: `${created.length} vélo(s) acquis`,
+      message: `Ajoutés au parc (${created.join(", ")}).`,
+    });
+  }
+
   return { ok: created.length > 0, created, failures };
 }
 
@@ -552,6 +670,13 @@ export async function updateVeloAction(input: {
     .eq("num_serie", input.numSerie);
 
   if (error) return { ok: false, error: error.message };
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    severity: "info",
+    kind: "PARC_UPDATED",
+    title: `Vélo modifié (${input.numSerie})`,
+    message: "Caractéristiques ou affectation mises à jour.",
+  });
   return { ok: true };
 }
 
@@ -601,6 +726,13 @@ export async function deleteVeloAction(numSerie: string) {
     .eq("num_serie", numSerie);
 
   if (error) return { ok: false, error: error.message };
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    severity: "info",
+    kind: "PARC_UPDATED",
+    title: `Vélo supprimé (${numSerie})`,
+    message: `Le vélo ${numSerie} a été retiré du parc.`,
+  });
   return { ok: true };
 }
 
@@ -647,6 +779,13 @@ export async function reformerVeloAction(input: {
     .eq("num_serie", input.numSerie);
 
   if (error) return { ok: false, error: error.message };
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    severity: "warning",
+    kind: "PARC_UPDATED",
+    title: `Vélo réformé (${input.numSerie})`,
+    message: `Motif : ${input.motif}.`,
+  });
   return { ok: true };
 }
 
@@ -703,6 +842,23 @@ export async function planifierReparationAction(input: {
     .update({ etat: "EN_REPARATION" })
     .eq("num_serie", rec.num_serie);
 
+  await broadcastVelosfEvent({
+    audience: "TECHNICIEN",
+    targetMatricule: input.matriculeTechnicien,
+    severity: "info",
+    kind: "REPARATION_PLANIFIEE",
+    title: `Réparation planifiée (${rec.num_serie})`,
+    message: `Intervention prévue le ${input.datePlanifiee}.`,
+    route: "T4",
+  });
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    severity: "info",
+    kind: "PARC_UPDATED",
+    title: `Vélo en réparation (${rec.num_serie})`,
+    message: `Réparation planifiée le ${input.datePlanifiee}.`,
+  });
+
   return { ok: true };
 }
 
@@ -728,6 +884,15 @@ export async function rouvrirReparationAction(idReparation: number) {
       .update({ etat: "EN_PANNE" })
       .eq("num_serie", numSerie);
   }
+  await broadcastVelosfEvent({
+    audience: "TECHNICIEN",
+    targetMatricule: rep.matricule_technicien,
+    severity: "warning",
+    kind: "REPARATION_ROUVERTE",
+    title: `Réparation #${idReparation} rouverte`,
+    message: numSerie ? `Vélo ${numSerie} à reprendre.` : "Intervention rouverte.",
+    route: "T4",
+  });
   return { ok: true };
 }
 
@@ -922,16 +1087,39 @@ export async function createItineraireEtMissionAction(input: {
   if (etErr) return { ok: false, error: etErr.message };
 
   if (input.mission) {
-    const { error: omErr } = await supabase.from("ordres_mission").insert({
-      id_itineraire: it.id_itineraire,
-      matricule_technicien: input.mission.matriculeTechnicien,
-      immatriculation_camion: input.mission.immatriculationCamion,
-      matricule_responsable: session.matricule,
-      date_mission: input.dateItineraire,
-      statut: "NON_DEMARRE",
-    });
+    const { data: createdOrder, error: omErr } = await supabase
+      .from("ordres_mission")
+      .insert({
+        id_itineraire: it.id_itineraire,
+        matricule_technicien: input.mission.matriculeTechnicien,
+        immatriculation_camion: input.mission.immatriculationCamion,
+        matricule_responsable: session.matricule,
+        date_mission: input.dateItineraire,
+        statut: "NON_DEMARRE",
+      })
+      .select("id_ordre")
+      .single();
     if (omErr) return { ok: false, error: omErr.message };
+
+    await broadcastVelosfEvent({
+      audience: "TECHNICIEN",
+      targetMatricule: input.mission.matriculeTechnicien,
+      severity: "info",
+      kind: "MISSION_ASSIGNED",
+      title: `Nouvel ordre de mission #${createdOrder?.id_ordre ?? ""}`,
+      message: `Camion ${input.mission.immatriculationCamion} · ${input.etapes.length} étape(s) le ${input.dateItineraire}.`,
+      route: "T3",
+    });
   }
+
+  await broadcastVelosfEvent({
+    audience: "RESPONSABLE",
+    severity: "info",
+    kind: "SYSTEM_SYNC",
+    title: "Itinéraire enregistré",
+    message: `Itinéraire #${it.id_itineraire} (${input.etapes.length} étape(s)).`,
+    route: "R14",
+  });
 
   return { ok: true, idItineraire: it.id_itineraire };
 }
@@ -966,6 +1154,15 @@ export async function updateOrdreMissionAction(input: {
     })
     .eq("id_ordre", input.idOrdre);
   if (error) return { ok: false, error: error.message };
+  await broadcastVelosfEvent({
+    audience: "TECHNICIEN",
+    targetMatricule: input.matriculeTechnicien,
+    severity: "warning",
+    kind: "MISSION_UPDATED",
+    title: `Ordre de mission #${input.idOrdre} modifié`,
+    message: `Statut : ${input.statut} · Camion ${input.immatriculationCamion} (${input.dateMission}).`,
+    route: "T3",
+  });
   return { ok: true };
 }
 
@@ -974,7 +1171,7 @@ export async function deleteOrdreMissionAction(idOrdre: number) {
   const supabase = getSupabaseAdmin();
   const { data: om } = await supabase
     .from("ordres_mission")
-    .select("statut")
+    .select("statut, matricule_technicien")
     .eq("id_ordre", idOrdre)
     .single();
   if (om?.statut === "EN_COURS") {
@@ -988,6 +1185,17 @@ export async function deleteOrdreMissionAction(idOrdre: number) {
     .delete()
     .eq("id_ordre", idOrdre);
   if (error) return { ok: false, error: error.message };
+  if (om?.matricule_technicien) {
+    await broadcastVelosfEvent({
+      audience: "TECHNICIEN",
+      targetMatricule: om.matricule_technicien,
+      severity: "warning",
+      kind: "MISSION_DELETED",
+      title: `Ordre de mission #${idOrdre} supprimé`,
+      message: "Cet ordre de mission a été retiré par le Responsable.",
+      route: "T3",
+    });
+  }
   return { ok: true };
 }
 
@@ -1014,6 +1222,13 @@ export async function toggleCamionDisponibleAction(
     .update({ disponible })
     .eq("immatriculation", immatriculation);
   if (error) return { ok: false, error: error.message };
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    severity: disponible ? "info" : "warning",
+    kind: "SYSTEM_SYNC",
+    title: `Camion ${immatriculation} ${disponible ? "disponible" : "indisponible"}`,
+    message: "Disponibilité mise à jour.",
+  });
   return { ok: true };
 }
 
@@ -1045,6 +1260,13 @@ export async function createCamionAction(input: {
     .select()
     .single();
   if (error) return { ok: false, error: error.message };
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    severity: "info",
+    kind: "SYSTEM_SYNC",
+    title: `Camion ajouté (${data.immatriculation})`,
+    message: `${data.modele} (cap. ${data.capacite} vélos).`,
+  });
   return { ok: true, camion: data };
 }
 
@@ -1087,6 +1309,13 @@ export async function updateCamionAction(input: {
     })
     .eq("immatriculation", input.immatriculation);
   if (error) return { ok: false, error: error.message };
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    severity: "info",
+    kind: "SYSTEM_SYNC",
+    title: `Camion mis à jour (${input.immatriculation})`,
+    message: input.modele.trim() || "Renault Master",
+  });
   return { ok: true };
 }
 
@@ -1114,6 +1343,13 @@ export async function deleteCamionAction(immatriculation: string) {
     .delete()
     .eq("immatriculation", immatriculation);
   if (error) return { ok: false, error: error.message };
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    severity: "info",
+    kind: "SYSTEM_SYNC",
+    title: `Camion supprimé (${immatriculation})`,
+    message: "Retiré du parc logistique.",
+  });
   return { ok: true };
 }
 
@@ -1179,6 +1415,14 @@ export async function createAbonneAction(input: {
 
   if (cErr || !carte) return { ok: false, error: cErr?.message ?? "Erreur carte" };
 
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    severity: "info",
+    kind: "SYSTEM_SYNC",
+    title: "Nouvel abonné enregistré",
+    message: `Carte #${carte.num_carte} attribuée à ${user.prenom} ${user.nom}.`,
+  });
+
   return { ok: true, user, carte, pinClair: pin };
 }
 
@@ -1194,6 +1438,13 @@ export async function gererCarteAdhesionAction(
       .from("cartes_adhesion")
       .update({ bloquee: false, tentatives_erronees: 0 })
       .eq("num_carte", numCarte);
+    await broadcastVelosfEvent({
+      audience: "ALL",
+      severity: "success",
+      kind: "SYSTEM_SYNC",
+      title: `Carte #${numCarte} débloquée`,
+      message: "La carte d'adhésion est de nouveau active sur les bornes.",
+    });
     return { ok: true };
   }
   if (action === "DESACTIVER") {
@@ -1201,6 +1452,13 @@ export async function gererCarteAdhesionAction(
       .from("cartes_adhesion")
       .update({ active: false })
       .eq("num_carte", numCarte);
+    await broadcastVelosfEvent({
+      audience: "ALL",
+      severity: "warning",
+      kind: "SYSTEM_SYNC",
+      title: `Carte #${numCarte} désactivée`,
+      message: "La carte d'adhésion a été désactivée.",
+    });
     return { ok: true };
   }
   if (action === "RENOUVELER") {
@@ -1214,6 +1472,13 @@ export async function gererCarteAdhesionAction(
         date_expiration: nextYear.toISOString().slice(0, 10),
       })
       .eq("num_carte", numCarte);
+    await broadcastVelosfEvent({
+      audience: "ALL",
+      severity: "success",
+      kind: "SYSTEM_SYNC",
+      title: `Carte #${numCarte} renouvelée`,
+      message: "Validité prolongée d'un an.",
+    });
     return { ok: true };
   }
   const pin = String(Math.floor(1000 + Math.random() * 9000));
@@ -1222,6 +1487,13 @@ export async function gererCarteAdhesionAction(
     .from("cartes_adhesion")
     .update({ code_secret_hash: codeSecretHash, bloquee: false, tentatives_erronees: 0 })
     .eq("num_carte", numCarte);
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    severity: "info",
+    kind: "SYSTEM_SYNC",
+    title: `Code PIN réinitialisé (carte #${numCarte})`,
+    message: "Le nouveau code secret est actif immédiatement.",
+  });
   return { ok: true, pinClair: pin };
 }
 
@@ -1260,6 +1532,13 @@ export async function createPersonnelAction(input: {
     .single();
 
   if (error) return { ok: false, error: error.message };
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    severity: "info",
+    kind: "SYSTEM_SYNC",
+    title: `Compte personnel créé (#${data.matricule})`,
+    message: `${data.prenom} ${data.nom} (${data.role}).`,
+  });
   return { ok: true, person: data };
 }
 
@@ -1295,6 +1574,13 @@ export async function updatePersonnelAction(input: {
     .update(updateData)
     .eq("matricule", input.matricule);
   if (error) return { ok: false, error: error.message };
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    severity: "info",
+    kind: "SYSTEM_SYNC",
+    title: `Personnel mis à jour (#${input.matricule})`,
+    message: `${input.prenom.trim()} ${input.nom.trim()}.`,
+  });
   return { ok: true };
 }
 
@@ -1344,6 +1630,13 @@ export async function deletePersonnelAction(matricule: number) {
     .delete()
     .eq("matricule", matricule);
   if (error) return { ok: false, error: error.message };
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    severity: "info",
+    kind: "SYSTEM_SYNC",
+    title: `Personnel supprimé (#${matricule})`,
+    message: "Compte supprimé.",
+  });
   return { ok: true };
 }
 
@@ -1381,5 +1674,12 @@ export async function togglePersonnelActifAction(
     .update({ actif })
     .eq("matricule", matricule);
   if (error) return { ok: false, error: error.message };
+  await broadcastVelosfEvent({
+    audience: "ALL",
+    severity: "info",
+    kind: "SYSTEM_SYNC",
+    title: `Compte personnel #${matricule} ${actif ? "réactivé" : "désactivé"}`,
+    message: "Statut du membre mis à jour.",
+  });
   return { ok: true };
 }

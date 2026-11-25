@@ -251,14 +251,36 @@ export function BorneKiosk({
   const touchActivity = () => setInactivitySec(60);
 
   const syncBorne = useCallback(async () => {
-    if (screen !== "K1" || !activeStation) return;
+    if (!activeStation || screen === "K6" || screen === "K10") return;
     const fresh = await getBorneBootstrapAction(activeStation.id_station);
     if (fresh.stations) setStations(fresh.stations);
-    if (fresh.activeStation) setActiveStation(fresh.activeStation);
-    if (fresh.bikes) setBikes(fresh.bikes as unknown as BikeItem[]);
-  }, [screen, activeStation]);
+    if (fresh.activeStation) {
+      setActiveStation(fresh.activeStation);
+      if (fresh.activeStation.borne_hors_service && screen !== "K1") {
+        setScreen("K1");
+      } else if (
+        fresh.activeStation.lecteur_en_panne &&
+        (screen === "K2" || screen === "K3")
+      ) {
+        setScreen("K1");
+      }
+    }
+    if (fresh.bikes) {
+      const nextBikes = fresh.bikes as unknown as BikeItem[];
+      setBikes(nextBikes);
+      if (
+        confirmBike &&
+        !nextBikes.some((b) => b.num_serie === confirmBike.num_serie)
+      ) {
+        setCardError(
+          `Le vélo ${confirmBike.num_serie} vient d'être pris ou mis en maintenance. Choisissez un autre vélo.`
+        );
+        setConfirmBike(null);
+      }
+    }
+  }, [screen, activeStation, confirmBike]);
 
-  useRealtimeRefresh(syncBorne, "velosf-borne-realtime", 5000);
+  useRealtimeRefresh(syncBorne, "velosf-borne-realtime", 8000);
 
   async function switchStation(idStation: number) {
     const res = await getBorneBootstrapAction(idStation);

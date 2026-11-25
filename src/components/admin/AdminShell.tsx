@@ -19,10 +19,15 @@ import {
   Users,
   History,
   UserCog,
-  Bell,
   Search,
   LogOut,
 } from "lucide-react";
+import {
+  NotificationBell,
+  LiveToastBanner,
+  type AppNotificationItem,
+} from "@/components/ui/NotificationBell";
+import type { VelosfRealtimeEvent } from "@/lib/realtime-types";
 import type { StaffSession } from "@/lib/auth";
 import type {
   Station,
@@ -187,13 +192,62 @@ export function AdminShell({
     { action: "PRENDRE" | "DEPOSER"; idStation: number; nbVelos: number }[]
   >([]);
   const [globalSearch, setGlobalSearch] = useState("");
+  const [liveNotifs, setLiveNotifs] = useState<AppNotificationItem[]>([]);
+  const [readIds, setReadIds] = useState<string[]>([]);
+  const [liveToast, setLiveToast] = useState<{
+    severity: VelosfRealtimeEvent["severity"];
+    title: string;
+    message: string;
+    route?: string;
+  } | null>(null);
 
   const refresh = useCallback(async () => {
     const fresh = await getAdminBootstrapAction();
     setData(fresh as AdminBootstrap);
   }, []);
 
-  useRealtimeRefresh(refresh, "velosf-admin-realtime", 4000);
+  const handleRealtimeEvent = useCallback((ev: VelosfRealtimeEvent) => {
+    if (ev.audience === "TECHNICIEN" || ev.audience === "BORNE") return;
+    const isActionable =
+      ev.kind !== "SYSTEM_SYNC" || ev.severity !== "info";
+    if (!isActionable) return;
+
+    setLiveNotifs((prev) => {
+      if (prev.some((x) => x.id === ev.id)) return prev;
+      return [
+        {
+          id: ev.id,
+          at: ev.at,
+          severity: ev.severity,
+          title: ev.title,
+          message: ev.message,
+          route: ev.route,
+          read: false,
+        },
+        ...prev,
+      ].slice(0, 25);
+    });
+    setLiveToast({
+      severity: ev.severity,
+      title: ev.title,
+      message: ev.message,
+      route: ev.route,
+    });
+    setTimeout(() => {
+      setLiveToast((curr) =>
+        curr && curr.title === ev.title && curr.message === ev.message
+          ? null
+          : curr
+      );
+    }, 5500);
+  }, []);
+
+  useRealtimeRefresh(
+    refresh,
+    "velosf-admin-realtime",
+    8000,
+    handleRealtimeEvent
+  );
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -219,7 +273,55 @@ export function AdminShell({
     }
   }
 
-  const unhandledRecs = data.reclamations.filter((r) => !r.traitee).length;
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const derivedAlerts: AppNotificationItem[] = [
+    ...data.reclamations
+      .filter((r) => !r.traitee)
+      .map((r) => ({
+        id: `rec-${r.id_reclamation}`,
+        at: r.date_reclamation,
+        severity: "alert" as const,
+        title: `Réclamation #${r.id_reclamation} (${r.num_serie})`,
+        message: r.diagnostic,
+        route: "R9",
+        read: readIds.includes(`rec-${r.id_reclamation}`),
+        persistent: true,
+      })),
+    ...data.locations
+      .filter(
+        (l) =>
+          !l.date_heure_fin &&
+          Date.now() - new Date(l.date_heure_debut).getTime() > 24 * 3600 * 1000
+      )
+      .map((l) => ({
+        id: `over24-${l.id_location}`,
+        at: l.date_heure_debut,
+        severity: "warning" as const,
+        title: `Location > 24h (${l.num_serie})`,
+        message: `Location #${l.id_location} en cours depuis plus de 24h.`,
+        route: "R17",
+        read: readIds.includes(`over24-${l.id_location}`),
+        persistent: true,
+      })),
+    ...data.reparations
+      .filter((r) => r.statut !== "TERMINEE" && r.date_planifiee < todayIso)
+      .map((r) => ({
+        id: `rep-late-${r.id_reparation}`,
+        at: r.date_planifiee,
+        severity: "warning" as const,
+        title: `Réparation #${r.id_reparation} en retard`,
+        message: `Prévue le ${r.date_planifiee} (${r.statut}).`,
+        route: "R11",
+        read: readIds.includes(`rep-late-${r.id_reparation}`),
+        persistent: true,
+      })),
+  ];
+
+  const allNotifications: AppNotificationItem[] = [
+    ...liveNotifs.map((n) => ({ ...n, read: n.read || readIds.includes(n.id) })),
+    ...derivedAlerts,
+  ];
+
   const activeVelo =
     data.velos.find((v) => v.num_serie === selectedBikeSerial) ?? data.velos[0];
   const activeRec =
@@ -290,19 +392,16 @@ export function AdminShell({
               <span className="h-2 w-2 animate-pulse rounded-full bg-[#5E7B3A]" />
               Temps réel
             </span>
-            <button
-              type="button"
-              onClick={() => setRoute("R9")}
-              className="relative rounded-[6px] border border-[#14232B] bg-[#F6F1E7] p-2 hover:bg-[#E3D9C6]"
-              aria-label="Réclamations non traitées"
-            >
-              <Bell className="h-4 w-4" />
-              {unhandledRecs > 0 && (
-                <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border border-[#14232B] bg-[#C8553D] px-1 font-mono-sfax text-[10px] font-bold text-white">
-                  {unhandledRecs}
-                </span>
-              )}
-            </button>
+            <NotificationBell
+              items={allNotifications}
+              onMarkRead={(id) =>
+                setReadIds((prev) => (prev.includes(id) ? prev : [...prev, id]))
+              }
+              onMarkAllRead={() =>
+                setReadIds(allNotifications.map((n) => n.id))
+              }
+              onSelectRoute={(r) => setRoute(r as AdminRoute)}
+            />
 
             <div className="text-right text-xs">
               <p className="font-semibold">
@@ -515,6 +614,11 @@ export function AdminShell({
           )}
         </main>
       </div>
+      <LiveToastBanner
+        toast={liveToast}
+        onDismiss={() => setLiveToast(null)}
+        onClick={(r) => setRoute(r as AdminRoute)}
+      />
     </div>
   );
 }

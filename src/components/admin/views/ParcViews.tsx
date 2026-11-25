@@ -385,68 +385,68 @@ export function StationsView({
             </p>
           ) : (
             <table className="w-full text-left text-base">
-            <thead className="border-b-[1.5px] border-[#14232B] bg-[#F6F1E7] font-mono-sfax text-xs uppercase">
-              <tr>
-                <th className="p-3.5">Station</th>
-                <th className="p-3.5">Entrepôt</th>
-                <th className="p-3.5">Remplissage</th>
-                <th className="p-3.5">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#E3D9C6]">
-              {filteredStations.map((s) => (
-                <tr
-                  key={s.id_station}
-                  onClick={() => setSelected(s)}
-                  className="cursor-pointer hover:bg-[#F6F1E7]/70"
-                >
-                  <td className="p-3.5">
-                    <p className="font-semibold">{s.nom}</p>
-                    <p className="text-sm text-[#14232B]/70">{s.adresse}</p>
-                  </td>
-                  <td className="p-3.5 text-sm">
-                    {entrepots.find((e) => e.id_entrepot === s.id_entrepot)?.nom ??
-                      "Sans entrepôt"}
-                  </td>
-                  <td className="p-3.5">
-                    <SlotTicks
-                      occupied={s.nb_velos_actuel}
-                      capacity={s.capacite}
-                      size="sm"
-                    />
-                  </td>
-                  <td className="p-3.5">
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openEdit(s);
-                        }}
-                        className="rounded border border-[#14232B] bg-[#F6F1E7] p-2 hover:bg-[#E3D9C6]"
-                        aria-label={`Modifier ${s.nom}`}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          const r = await deleteStationAction(s.id_station);
-                          if (!r.ok && r.error) setErr(r.error);
-                          await onRefresh();
-                        }}
-                        className="rounded border border-[#C8553D] p-2 text-[#9B3925] hover:bg-[#C8553D]/10"
-                        aria-label={`Supprimer ${s.nom}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </td>
+              <thead className="border-b-[1.5px] border-[#14232B] bg-[#F6F1E7] font-mono-sfax text-xs uppercase">
+                <tr>
+                  <th className="p-3.5">Station</th>
+                  <th className="p-3.5">Entrepôt</th>
+                  <th className="p-3.5">Remplissage</th>
+                  <th className="p-3.5">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-[#E3D9C6]">
+                {filteredStations.map((s) => (
+                  <tr
+                    key={s.id_station}
+                    onClick={() => setSelected(s)}
+                    className="cursor-pointer hover:bg-[#F6F1E7]/70"
+                  >
+                    <td className="p-3.5">
+                      <p className="font-semibold">{s.nom}</p>
+                      <p className="text-sm text-[#14232B]/70">{s.adresse}</p>
+                    </td>
+                    <td className="p-3.5 text-sm">
+                      {entrepots.find((e) => e.id_entrepot === s.id_entrepot)?.nom ??
+                        "Sans entrepôt"}
+                    </td>
+                    <td className="p-3.5">
+                      <SlotTicks
+                        occupied={s.nb_velos_actuel}
+                        capacity={s.capacite}
+                        size="sm"
+                      />
+                    </td>
+                    <td className="p-3.5">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEdit(s);
+                          }}
+                          className="rounded border border-[#14232B] bg-[#F6F1E7] p-2 hover:bg-[#E3D9C6]"
+                          aria-label={`Modifier ${s.nom}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            const r = await deleteStationAction(s.id_station);
+                            if (!r.ok && r.error) setErr(r.error);
+                            await onRefresh();
+                          }}
+                          className="rounded border border-[#C8553D] p-2 text-[#9B3925] hover:bg-[#C8553D]/10"
+                          aria-label={`Supprimer ${s.nom}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
         </div>
 
@@ -608,11 +608,10 @@ function EditVeloModal({
                   setCouleurNom(c.nom);
                   setCouleurHex(c.hex);
                 }}
-                className={`inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs font-semibold ${
-                  couleurNom === c.nom
+                className={`inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs font-semibold ${couleurNom === c.nom
                     ? "border-[#14232B] bg-[#F0A42B]/30"
                     : "border-[#E3D9C6] bg-[#F6F1E7]"
-                }`}
+                  }`}
               >
                 <span
                   className="h-3.5 w-3.5 rounded-full border border-[#14232B]"
@@ -822,9 +821,8 @@ export function ParcVelosView({
               key={et}
               type="button"
               onClick={() => setEtatFilter(et)}
-              className={`rounded-[6px] border border-[#14232B] px-3 py-1 font-mono-sfax text-xs font-semibold ${
-                etatFilter === et ? "bg-[#0E5A6B] text-white" : "bg-[#FFFDF8]"
-              }`}
+              className={`rounded-[6px] border border-[#14232B] px-3 py-1 font-mono-sfax text-xs font-semibold ${etatFilter === et ? "bg-[#0E5A6B] text-white" : "bg-[#FFFDF8]"
+                }`}
             >
               {et === "ALL" ? "Tous états" : et}
             </button>
@@ -872,99 +870,98 @@ export function ParcVelosView({
               : "Aucun vélo ne correspond aux filtres."}
           </p>
         ) : (
-        <table className="w-full text-left text-base">
-          <thead className="border-b-[1.5px] border-[#14232B] bg-[#F6F1E7] font-mono-sfax text-xs uppercase">
-            <tr>
-              <th className="p-3.5">N° Série</th>
-              <th className="p-3.5">Type</th>
-              <th className="p-3.5">Couleur</th>
-              <th className="p-3.5">Fournisseur</th>
-              <th className="p-3.5">Localisation</th>
-              <th className="p-3.5">État</th>
-              <th className="p-3.5">Acquisition</th>
-              <th className="p-3.5">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#E3D9C6]">
-            {filtered.map((v) => (
-              <tr
-                key={v.num_serie}
-                onClick={() => onSelectBike(v.num_serie)}
-                className={`cursor-pointer hover:bg-[#F6F1E7]/80 ${
-                  v.etat === "REFORME" ? "bg-reforme-stripes opacity-70" : ""
-                }`}
-              >
-                <td className="p-3.5 font-mono-sfax font-bold text-[#0E5A6B]">
-                  {v.num_serie}
-                </td>
-                <td className="p-3.5">
-                  {types.find((t) => t.id_type === v.id_type)?.libelle}
-                </td>
-                <td className="p-3.5">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span
-                      className="h-3.5 w-3.5 rounded-full border border-[#14232B]"
-                      style={{ backgroundColor: v.couleur_hex }}
-                    />
-                    {v.couleur}
-                  </span>
-                </td>
-                <td className="p-3.5 text-sm">
-                  {fournisseurs.find((f) => f.id_fournisseur === v.id_fournisseur)?.nom}
-                </td>
-                <td className="p-3.5 text-sm">
-                  {v.immatriculation_camion ? (
-                    <span className="inline-flex items-center gap-1 font-mono-sfax font-semibold text-[#0E5A6B]">
-                      <Truck className="h-4 w-4" /> {v.immatriculation_camion}
-                    </span>
-                  ) : v.id_station ? (
-                    stations.find((s) => s.id_station === v.id_station)?.nom
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td className="p-3.5">
-                  <StatusChip etat={v.etat} />
-                </td>
-                <td className="p-3.5 font-mono-sfax text-sm">
-                  {formatDate(v.date_acquisition)}
-                </td>
-                <td className="p-3.5">
-                  <div className="flex items-center gap-2">
-                    {v.etat !== "LOUE" && v.etat !== "REFORME" && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActionErr(null);
-                          setEditingBike(v);
-                        }}
-                        className="rounded border border-[#14232B] bg-[#F6F1E7] p-2 hover:bg-[#E3D9C6]"
-                        aria-label={`Modifier ${v.num_serie}`}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                    )}
-                    {v.etat !== "LOUE" && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActionErr(null);
-                          setDeletingBike(v);
-                        }}
-                        className="rounded border border-[#C8553D] p-2 text-[#9B3925] hover:bg-[#C8553D]/10"
-                        aria-label={`Supprimer ${v.num_serie}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                </td>
+          <table className="w-full text-left text-base">
+            <thead className="border-b-[1.5px] border-[#14232B] bg-[#F6F1E7] font-mono-sfax text-xs uppercase">
+              <tr>
+                <th className="p-3.5">N° Série</th>
+                <th className="p-3.5">Type</th>
+                <th className="p-3.5">Couleur</th>
+                <th className="p-3.5">Fournisseur</th>
+                <th className="p-3.5">Localisation</th>
+                <th className="p-3.5">État</th>
+                <th className="p-3.5">Acquisition</th>
+                <th className="p-3.5">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-[#E3D9C6]">
+              {filtered.map((v) => (
+                <tr
+                  key={v.num_serie}
+                  onClick={() => onSelectBike(v.num_serie)}
+                  className={`cursor-pointer hover:bg-[#F6F1E7]/80 ${v.etat === "REFORME" ? "bg-reforme-stripes opacity-70" : ""
+                    }`}
+                >
+                  <td className="p-3.5 font-mono-sfax font-bold text-[#0E5A6B]">
+                    {v.num_serie}
+                  </td>
+                  <td className="p-3.5">
+                    {types.find((t) => t.id_type === v.id_type)?.libelle}
+                  </td>
+                  <td className="p-3.5">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span
+                        className="h-3.5 w-3.5 rounded-full border border-[#14232B]"
+                        style={{ backgroundColor: v.couleur_hex }}
+                      />
+                      {v.couleur}
+                    </span>
+                  </td>
+                  <td className="p-3.5 text-sm">
+                    {fournisseurs.find((f) => f.id_fournisseur === v.id_fournisseur)?.nom}
+                  </td>
+                  <td className="p-3.5 text-sm">
+                    {v.immatriculation_camion ? (
+                      <span className="inline-flex items-center gap-1 font-mono-sfax font-semibold text-[#0E5A6B]">
+                        <Truck className="h-4 w-4" /> {v.immatriculation_camion}
+                      </span>
+                    ) : v.id_station ? (
+                      stations.find((s) => s.id_station === v.id_station)?.nom
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td className="p-3.5">
+                    <StatusChip etat={v.etat} />
+                  </td>
+                  <td className="p-3.5 font-mono-sfax text-sm">
+                    {formatDate(v.date_acquisition)}
+                  </td>
+                  <td className="p-3.5">
+                    <div className="flex items-center gap-2">
+                      {v.etat !== "LOUE" && v.etat !== "REFORME" && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActionErr(null);
+                            setEditingBike(v);
+                          }}
+                          className="rounded border border-[#14232B] bg-[#F6F1E7] p-2 hover:bg-[#E3D9C6]"
+                          aria-label={`Modifier ${v.num_serie}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                      )}
+                      {v.etat !== "LOUE" && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActionErr(null);
+                            setDeletingBike(v);
+                          }}
+                          className="rounded border border-[#C8553D] p-2 text-[#9B3925] hover:bg-[#C8553D]/10"
+                          aria-label={`Supprimer ${v.num_serie}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
 
@@ -1134,8 +1131,8 @@ export function FicheVeloView({
                   →{" "}
                   {l.id_station_arrivee_reelle
                     ? stations.find(
-                        (s) => s.id_station === l.id_station_arrivee_reelle
-                      )?.nom
+                      (s) => s.id_station === l.id_station_arrivee_reelle
+                    )?.nom
                     : "En cours"}
                 </p>
               </div>
@@ -1320,8 +1317,8 @@ export function AcquerirVeloView({
 
   const [idStation, setIdStation] = useState<number>(
     stations.find((s) => s.nb_velos_actuel < s.capacite)?.id_station ??
-      stations[0]?.id_station ??
-      0
+    stations[0]?.id_station ??
+    0
   );
   const [isReplacement, setIsReplacement] = useState(false);
   const [replaceSerial, setReplaceSerial] = useState("");
@@ -1330,9 +1327,9 @@ export function AcquerirVeloView({
 
   const serialList = seriesMode
     ? serialInput
-        .split(/[\n,;]+/)
-        .map((s) => s.trim().toUpperCase())
-        .filter(Boolean)
+      .split(/[\n,;]+/)
+      .map((s) => s.trim().toUpperCase())
+      .filter(Boolean)
     : [serialInput.trim().toUpperCase()];
 
   const existsInDb =
@@ -1472,11 +1469,10 @@ export function AcquerirVeloView({
                       key={c.nom}
                       type="button"
                       onClick={() => setCouleur(c)}
-                      className={`inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs font-semibold ${
-                        couleur.nom === c.nom
+                      className={`inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs font-semibold ${couleur.nom === c.nom
                           ? "border-[#14232B] bg-[#F0A42B]/30"
                           : "border-[#E3D9C6] bg-[#F6F1E7]"
-                      }`}
+                        }`}
                     >
                       <span
                         className="h-3.5 w-3.5 rounded-full border border-[#14232B]"
@@ -1522,10 +1518,10 @@ export function AcquerirVeloView({
                   <option value={0}>Aucun fournisseur — ajoutez-en un ci-dessus</option>
                 )}
                 {activeFournisseurs.map((f) => (
-                    <option key={f.id_fournisseur} value={f.id_fournisseur}>
-                      {f.nom} ({f.tel})
-                    </option>
-                  ))}
+                  <option key={f.id_fournisseur} value={f.id_fournisseur}>
+                    {f.nom} ({f.tel})
+                  </option>
+                ))}
               </select>
 
               {showNewFourn && (
@@ -1724,8 +1720,8 @@ export function FournisseursView({
   const similarMatch =
     !editing && nom.trim().length >= 4
       ? fournisseurs.find((f) =>
-          f.nom.toLowerCase().includes(nom.trim().toLowerCase())
-        )
+        f.nom.toLowerCase().includes(nom.trim().toLowerCase())
+      )
       : null;
 
   function startEdit(f: Fournisseur) {
@@ -1835,78 +1831,78 @@ export function FournisseursView({
             Aucun fournisseur enregistré pour le moment.
           </p>
         ) : (
-        <table className="w-full text-left text-base">
-          <thead className="border-b-[1.5px] border-[#14232B] bg-[#F6F1E7] font-mono-sfax text-xs uppercase">
-            <tr>
-              <th className="p-3.5">Nom</th>
-              <th className="p-3.5">Adresse</th>
-              <th className="p-3.5">Téléphone</th>
-              <th className="p-3.5">Vélos fournis</th>
-              <th className="p-3.5">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#E3D9C6]">
-            {fournisseurs.map((f) => {
-              const count = velos.filter(
-                (v) => v.id_fournisseur === f.id_fournisseur
-              ).length;
-              return (
-                <tr key={f.id_fournisseur} className={f.archive ? "opacity-55" : ""}>
-                  <td className="p-3.5 font-semibold">
-                    {f.nom} {f.archive && "(Archivé)"}
-                  </td>
-                  <td className="p-3.5 text-sm">{f.adresse}</td>
-                  <td className="p-3.5 font-mono-sfax text-sm">{f.tel}</td>
-                  <td className="p-3.5 font-mono-sfax">{count}</td>
-                  <td className="p-3.5">
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => startEdit(f)}
-                        className="inline-flex items-center gap-1 rounded border border-[#14232B] bg-[#F6F1E7] px-2.5 py-1 text-xs font-semibold hover:bg-[#E3D9C6]"
-                      >
-                        <Pencil className="h-3.5 w-3.5" /> Modifier
-                      </button>
-                      {f.archive ? (
+          <table className="w-full text-left text-base">
+            <thead className="border-b-[1.5px] border-[#14232B] bg-[#F6F1E7] font-mono-sfax text-xs uppercase">
+              <tr>
+                <th className="p-3.5">Nom</th>
+                <th className="p-3.5">Adresse</th>
+                <th className="p-3.5">Téléphone</th>
+                <th className="p-3.5">Vélos fournis</th>
+                <th className="p-3.5">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#E3D9C6]">
+              {fournisseurs.map((f) => {
+                const count = velos.filter(
+                  (v) => v.id_fournisseur === f.id_fournisseur
+                ).length;
+                return (
+                  <tr key={f.id_fournisseur} className={f.archive ? "opacity-55" : ""}>
+                    <td className="p-3.5 font-semibold">
+                      {f.nom} {f.archive && "(Archivé)"}
+                    </td>
+                    <td className="p-3.5 text-sm">{f.adresse}</td>
+                    <td className="p-3.5 font-mono-sfax text-sm">{f.tel}</td>
+                    <td className="p-3.5 font-mono-sfax">{count}</td>
+                    <td className="p-3.5">
+                      <div className="flex flex-wrap gap-2">
                         <button
                           type="button"
-                          onClick={async () => {
-                            await updateFournisseurAction({
-                              idFournisseur: f.id_fournisseur,
-                              nom: f.nom,
-                              adresse: f.adresse,
-                              tel: f.tel,
-                              archive: false,
-                            });
-                            await onRefresh();
-                          }}
-                          className="inline-flex items-center gap-1 rounded border border-[#5E7B3A] px-2.5 py-1 text-xs font-semibold text-[#3D5223]"
+                          onClick={() => startEdit(f)}
+                          className="inline-flex items-center gap-1 rounded border border-[#14232B] bg-[#F6F1E7] px-2.5 py-1 text-xs font-semibold hover:bg-[#E3D9C6]"
                         >
-                          Désarchiver
+                          <Pencil className="h-3.5 w-3.5" /> Modifier
                         </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const r = await archiveOrDeleteFournisseurAction(
-                              f.id_fournisseur
-                            );
-                            if (r.message) setMsg(r.message);
-                            await onRefresh();
-                          }}
-                          className="inline-flex items-center gap-1 rounded border border-[#C8553D] px-2.5 py-1 text-xs font-semibold text-[#9B3925]"
-                        >
-                          <Archive className="h-3.5 w-3.5" />{" "}
-                          {count > 0 ? "Archiver" : "Supprimer"}
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                        {f.archive ? (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              await updateFournisseurAction({
+                                idFournisseur: f.id_fournisseur,
+                                nom: f.nom,
+                                adresse: f.adresse,
+                                tel: f.tel,
+                                archive: false,
+                              });
+                              await onRefresh();
+                            }}
+                            className="inline-flex items-center gap-1 rounded border border-[#5E7B3A] px-2.5 py-1 text-xs font-semibold text-[#3D5223]"
+                          >
+                            Désarchiver
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const r = await archiveOrDeleteFournisseurAction(
+                                f.id_fournisseur
+                              );
+                              if (r.message) setMsg(r.message);
+                              await onRefresh();
+                            }}
+                            className="inline-flex items-center gap-1 rounded border border-[#C8553D] px-2.5 py-1 text-xs font-semibold text-[#9B3925]"
+                          >
+                            <Archive className="h-3.5 w-3.5" />{" "}
+                            {count > 0 ? "Archiver" : "Supprimer"}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         )}
       </div>
     </div>
@@ -1943,18 +1939,16 @@ export function TypesEntrepotsView({
         <button
           type="button"
           onClick={() => setTab("TYPES")}
-          className={`rounded-[6px] border-[1.5px] border-[#14232B] px-4 py-2 text-sm font-semibold ${
-            tab === "TYPES" ? "bg-[#0E5A6B] text-white" : "bg-[#FFFDF8]"
-          }`}
+          className={`rounded-[6px] border-[1.5px] border-[#14232B] px-4 py-2 text-sm font-semibold ${tab === "TYPES" ? "bg-[#0E5A6B] text-white" : "bg-[#FFFDF8]"
+            }`}
         >
           Types de vélo ({types.length})
         </button>
         <button
           type="button"
           onClick={() => setTab("ENTREPOTS")}
-          className={`rounded-[6px] border-[1.5px] border-[#14232B] px-4 py-2 text-sm font-semibold ${
-            tab === "ENTREPOTS" ? "bg-[#0E5A6B] text-white" : "bg-[#FFFDF8]"
-          }`}
+          className={`rounded-[6px] border-[1.5px] border-[#14232B] px-4 py-2 text-sm font-semibold ${tab === "ENTREPOTS" ? "bg-[#0E5A6B] text-white" : "bg-[#FFFDF8]"
+            }`}
         >
           Entrepôts ({entrepots.length})
         </button>
@@ -2022,41 +2016,41 @@ export function TypesEntrepotsView({
                 Aucun type de vélo enregistré pour le moment.
               </p>
             ) : (
-            types.map((t) => {
-              const count = velos.filter((v) => v.id_type === t.id_type).length;
-              return (
-                <div
-                  key={t.id_type}
-                  className="flex items-center justify-between p-4"
-                >
-                  <div>
-                    <span className="text-base font-semibold">{t.libelle}</span>
-                    <span className="ml-3 font-mono-sfax text-sm text-[#0E5A6B]">
-                      {count} vélo(s)
-                    </span>
+              types.map((t) => {
+                const count = velos.filter((v) => v.id_type === t.id_type).length;
+                return (
+                  <div
+                    key={t.id_type}
+                    className="flex items-center justify-between p-4"
+                  >
+                    <div>
+                      <span className="text-base font-semibold">{t.libelle}</span>
+                      <span className="ml-3 font-mono-sfax text-sm text-[#0E5A6B]">
+                        {count} vélo(s)
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingType(t);
+                          setLibelle(t.libelle);
+                        }}
+                        className="rounded border border-[#14232B] bg-[#F6F1E7] px-3 py-1 text-xs font-semibold"
+                      >
+                        Modifier
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDelete(t)}
+                        className="rounded border border-[#C8553D] px-3 py-1 text-xs font-semibold text-[#9B3925]"
+                      >
+                        Supprimer
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingType(t);
-                        setLibelle(t.libelle);
-                      }}
-                      className="rounded border border-[#14232B] bg-[#F6F1E7] px-3 py-1 text-xs font-semibold"
-                    >
-                      Modifier
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmDelete(t)}
-                      className="rounded border border-[#C8553D] px-3 py-1 text-xs font-semibold text-[#9B3925]"
-                    >
-                      Supprimer
-                    </button>
-                  </div>
-                </div>
-              );
-            })
+                );
+              })
             )}
           </div>
         </div>
@@ -2130,45 +2124,45 @@ export function TypesEntrepotsView({
                 Aucun entrepôt enregistré pour le moment.
               </p>
             ) : (
-            entrepots.map((e) => (
-              <div
-                key={e.id_entrepot}
-                className="flex flex-wrap items-center justify-between gap-4 p-4"
-              >
-                <div>
-                  <p className="text-base font-semibold">{e.nom}</p>
-                  <p className="text-sm text-[#14232B]/70">{e.adresse}</p>
-                  <p className="mt-1 font-mono-sfax text-xs text-[#0E5A6B]">
-                    {stations.filter((s) => s.id_entrepot === e.id_entrepot).length}{" "}
-                    station(s) rattachée(s)
-                  </p>
+              entrepots.map((e) => (
+                <div
+                  key={e.id_entrepot}
+                  className="flex flex-wrap items-center justify-between gap-4 p-4"
+                >
+                  <div>
+                    <p className="text-base font-semibold">{e.nom}</p>
+                    <p className="text-sm text-[#14232B]/70">{e.adresse}</p>
+                    <p className="mt-1 font-mono-sfax text-xs text-[#0E5A6B]">
+                      {stations.filter((s) => s.id_entrepot === e.id_entrepot).length}{" "}
+                      station(s) rattachée(s)
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingEnt(e);
+                        setEntNom(e.nom);
+                        setEntAdr(e.adresse);
+                      }}
+                      className="rounded border border-[#14232B] bg-[#F6F1E7] px-3 py-1 text-xs font-semibold"
+                    >
+                      Modifier
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const r = await deleteEntrepotAction(e.id_entrepot);
+                        if (!r.ok && r.error) setErr(r.error);
+                        await onRefresh();
+                      }}
+                      className="rounded border border-[#C8553D] px-3 py-1 text-xs font-semibold text-[#9B3925]"
+                    >
+                      Supprimer
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingEnt(e);
-                      setEntNom(e.nom);
-                      setEntAdr(e.adresse);
-                    }}
-                    className="rounded border border-[#14232B] bg-[#F6F1E7] px-3 py-1 text-xs font-semibold"
-                  >
-                    Modifier
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const r = await deleteEntrepotAction(e.id_entrepot);
-                      if (!r.ok && r.error) setErr(r.error);
-                      await onRefresh();
-                    }}
-                    className="rounded border border-[#C8553D] px-3 py-1 text-xs font-semibold text-[#9B3925]"
-                  >
-                    Supprimer
-                  </button>
-                </div>
-              </div>
-            ))
+              ))
             )}
           </div>
         </div>
