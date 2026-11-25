@@ -15,9 +15,8 @@ export default async function BornePage() {
           </h1>
           <p className="mt-2 text-sm">
             {data.error} Exécutez d&apos;abord{" "}
-            <code className="font-mono-sfax">supabase/schema.sql</code> et{" "}
-            <code className="font-mono-sfax">supabase/seed.sql</code> dans votre
-            projet Supabase.
+            <code className="font-mono-sfax">supabase/schema.sql</code> dans
+            votre projet Supabase.
           </p>
         </div>
       </main>

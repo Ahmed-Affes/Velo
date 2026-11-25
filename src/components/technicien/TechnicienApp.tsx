@@ -33,6 +33,8 @@ import {
   getTechnicienBootstrapAction,
   enregistrerControleJournalierAction,
   executerEtapeMissionAction,
+  recupererVeloEnPanneMissionAction,
+  dechargerVeloAtelierAction,
   cloturerMissionAction,
   demarrerReparationAction,
   cloturerReparationAction,
@@ -109,7 +111,7 @@ export function TechnicienApp({
   const [diagText, setDiagText] = useState("");
 
   // T3 Mission
-  const [stepCount, setStepCount] = useState<number>(0);
+  const [stepCount, setStepCount] = useState<number | null>(null);
   const [stepReason, setStepReason] = useState("");
 
   // T4 Réparations
@@ -126,8 +128,63 @@ export function TechnicienApp({
 
   useRealtimeRefresh(refresh, "velosf-tech-realtime", 4000);
 
+  function showToastMsg(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(null), 4000);
+  }
+
+  const syncOfflineQueue = useCallback(async () => {
+    const raw = localStorage.getItem("velosf_tech_queue");
+    if (!raw) return;
+    let queue: Array<{ numSerie: string; bonEtat: boolean; diagnostic?: string }> =
+      [];
+    try {
+      queue = JSON.parse(raw);
+    } catch {
+      localStorage.removeItem("velosf_tech_queue");
+      setPendingQueue(0);
+      return;
+    }
+    if (!Array.isArray(queue) || queue.length === 0) {
+      setPendingQueue(0);
+      return;
+    }
+
+    const remaining: typeof queue = [];
+    let synced = 0;
+    for (const item of queue) {
+      try {
+        const res = await enregistrerControleJournalierAction(item);
+        if (res.ok) {
+          synced += 1;
+        } else {
+          remaining.push(item);
+        }
+      } catch {
+        remaining.push(item);
+      }
+    }
+
+    if (remaining.length > 0) {
+      localStorage.setItem("velosf_tech_queue", JSON.stringify(remaining));
+    } else {
+      localStorage.removeItem("velosf_tech_queue");
+    }
+    setPendingQueue(remaining.length);
+    if (synced > 0) {
+      showToastMsg(`${synced} contrôle(s) hors-ligne synchronisé(s).`);
+      await refresh();
+    }
+  }, [refresh]);
+
   useEffect(() => {
-    const updateNet = () => setOffline(!navigator.onLine);
+    const updateNet = () => {
+      const isOff = !navigator.onLine;
+      setOffline(isOff);
+      if (!isOff) {
+        void syncOfflineQueue();
+      }
+    };
     updateNet();
     window.addEventListener("online", updateNet);
     window.addEventListener("offline", updateNet);
@@ -143,12 +200,7 @@ export function TechnicienApp({
       window.removeEventListener("online", updateNet);
       window.removeEventListener("offline", updateNet);
     };
-  }, []);
-
-  function showToastMsg(msg: string) {
-    setToast(msg);
-    setTimeout(() => setToast(null), 4000);
-  }
+  }, [syncOfflineQueue]);
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -173,11 +225,12 @@ export function TechnicienApp({
       )
     : null;
 
-  const bikesInTruck = currentMission
+  const bikesAboardList = currentMission
     ? data.velos.filter(
         (v) => v.immatriculation_camion === currentMission.immatriculation_camion
-      ).length
-    : 0;
+      )
+    : [];
+  const bikesInTruck = bikesAboardList.length;
 
   const activeBikesTotal = data.velos.filter((v) => v.etat !== "REFORME").length;
   const checkedCount = data.controlesAujourdhui.length;
@@ -230,7 +283,7 @@ export function TechnicienApp({
 
   async function handleFinishEtape() {
     if (!currentMission || !currentEtape) return;
-    const countToSend = stepCount > 0 ? stepCount : currentEtape.nb_velos;
+    const countToSend = stepCount ?? currentEtape.nb_velos;
     if (countToSend !== currentEtape.nb_velos && !stepReason.trim()) {
       showToastMsg("Précisez la raison de l'écart par rapport au plan.");
       return;
@@ -247,9 +300,41 @@ export function TechnicienApp({
       showToastMsg(res.error ?? "Erreur");
       return;
     }
-    setStepCount(0);
+    setStepCount(null);
     setStepReason("");
     showToastMsg("Étape validée.");
+    await refresh();
+  }
+
+  async function handlePickupBrokenBike(numSerie: string) {
+    if (!currentMission) return;
+    setBusy(true);
+    const res = await recupererVeloEnPanneMissionAction({
+      idOrdre: currentMission.id_ordre,
+      numSerie,
+    });
+    setBusy(false);
+    if (!res.ok) {
+      showToastMsg(res.error ?? "Erreur");
+      return;
+    }
+    showToastMsg(`Vélo en panne ${numSerie} chargé dans le camion.`);
+    await refresh();
+  }
+
+  async function handleUnloadBrokenBike(numSerie: string) {
+    if (!currentMission) return;
+    setBusy(true);
+    const res = await dechargerVeloAtelierAction({
+      idOrdre: currentMission.id_ordre,
+      numSerie,
+    });
+    setBusy(false);
+    if (!res.ok) {
+      showToastMsg(res.error ?? "Erreur");
+      return;
+    }
+    showToastMsg(`Vélo ${numSerie} déchargé à l'atelier.`);
     await refresh();
   }
 
@@ -359,13 +444,15 @@ export function TechnicienApp({
               <span className="h-2 w-2 animate-pulse rounded-full bg-[#5E7B3A]" />
               Temps réel
             </span>
-            <button
-              type="button"
-              onClick={() => setOffline((v) => !v)}
-              className="rounded border border-[#14232B] bg-[#F6F1E7] px-3 py-1.5 font-mono-sfax text-xs font-semibold"
-            >
-              {offline ? "Sim. Online" : "Sim. Offline"}
-            </button>
+            {pendingQueue > 0 && !offline && (
+              <button
+                type="button"
+                onClick={() => void syncOfflineQueue()}
+                className="rounded border border-[#14232B] bg-[#F0A42B] px-3 py-1.5 font-mono-sfax text-xs font-semibold text-[#14232B]"
+              >
+                Synchroniser ({pendingQueue})
+              </button>
+            )}
             <button
               type="button"
               onClick={handleLogout}
@@ -526,7 +613,7 @@ export function TechnicienApp({
                     type="text"
                     value={scanSerial}
                     onChange={(e) => setScanSerial(e.target.value.toUpperCase())}
-                    placeholder="VSF-000401"
+                    placeholder="VSF-XXXXXX"
                     className="flex-1 rounded-[6px] border-[1.5px] border-[#14232B] bg-[#F6F1E7] px-3.5 py-2.5 font-mono-sfax text-lg"
                   />
                   <button
@@ -720,6 +807,40 @@ export function TechnicienApp({
                         </span>
                       </p>
                     </div>
+
+                    {bikesAboardList.length > 0 && (
+                      <div className="space-y-2 border-t border-dotted border-[#14232B] pt-3">
+                        <p className="font-mono-sfax text-xs font-bold uppercase text-[#0E5A6B]">
+                          Vélos à bord ({bikesAboardList.length})
+                        </p>
+                        <div className="space-y-1.5">
+                          {bikesAboardList.map((b) => (
+                            <div
+                              key={b.num_serie}
+                              className="flex items-center justify-between gap-2 rounded border border-[#E3D9C6] bg-[#F6F1E7] px-2.5 py-1.5 text-xs"
+                            >
+                              <span className="font-mono-sfax font-bold">
+                                {b.num_serie}
+                              </span>
+                              <StatusChip etat={b.etat} size="sm" />
+                              {(b.etat === "EN_PANNE" ||
+                                b.etat === "EN_REPARATION") && (
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void handleUnloadBrokenBike(b.num_serie)
+                                  }
+                                  className="rounded border border-[#14232B] bg-[#FFFDF8] px-2 py-0.5 font-semibold hover:bg-[#E3D9C6]"
+                                >
+                                  Décharger atelier
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Liste des étapes */}
@@ -731,6 +852,12 @@ export function TechnicienApp({
                       const isCurrent =
                         currentEtape?.id_etape === etape.id_etape &&
                         currentMission.statut !== "TERMINE";
+                      const brokenAtStation = data.velos.filter(
+                        (v) =>
+                          v.id_station === etape.id_station &&
+                          v.etat === "EN_PANNE"
+                      );
+                      const effectiveCount = stepCount ?? etape.nb_velos;
                       return (
                         <div
                           key={etape.id_etape}
@@ -750,6 +877,32 @@ export function TechnicienApp({
                           </div>
                           <p className="mt-1 text-xl font-bold">{st?.nom}</p>
 
+                          {brokenAtStation.length > 0 &&
+                            currentMission.statut !== "TERMINE" &&
+                            currentMission.statut !== "ANNULE" && (
+                              <div className="mt-3 rounded border border-[#C8553D] bg-[#C8553D]/10 p-3">
+                                <p className="font-mono-sfax text-xs font-bold uppercase text-[#9B3925]">
+                                  Vélos en panne à récupérer ({brokenAtStation.length})
+                                </p>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {brokenAtStation.map((b) => (
+                                    <button
+                                      key={b.num_serie}
+                                      type="button"
+                                      disabled={busy}
+                                      onClick={() =>
+                                        void handlePickupBrokenBike(b.num_serie)
+                                      }
+                                      className="inline-flex items-center gap-1.5 rounded border border-[#14232B] bg-[#FFFDF8] px-2.5 py-1 font-mono-sfax text-xs font-semibold hover:bg-[#F0A42B]/25"
+                                    >
+                                      <AlertTriangle className="h-3.5 w-3.5 text-[#C8553D]" />
+                                      Récupérer {b.num_serie}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
                           {isCurrent && (
                             <div className="mt-4 space-y-3 border-t border-dotted border-[#14232B] pt-4">
                               <div className="flex items-center justify-between">
@@ -763,7 +916,7 @@ export function TechnicienApp({
                                       setStepCount((c) =>
                                         Math.max(
                                           0,
-                                          (c || etape.nb_velos) - 1
+                                          (c ?? etape.nb_velos) - 1
                                         )
                                       )
                                     }
@@ -772,13 +925,13 @@ export function TechnicienApp({
                                     −
                                   </button>
                                   <span className="font-mono-sfax text-2xl font-bold">
-                                    {stepCount || etape.nb_velos}
+                                    {effectiveCount}
                                   </span>
                                   <button
                                     type="button"
                                     onClick={() =>
                                       setStepCount(
-                                        (c) => (c || etape.nb_velos) + 1
+                                        (c) => (c ?? etape.nb_velos) + 1
                                       )
                                     }
                                     className="btn-sfax-outline h-12 w-12 text-xl"
@@ -788,18 +941,17 @@ export function TechnicienApp({
                                 </div>
                               </div>
 
-                              {stepCount > 0 &&
-                                stepCount !== etape.nb_velos && (
-                                  <input
-                                    type="text"
-                                    value={stepReason}
-                                    onChange={(e) =>
-                                      setStepReason(e.target.value)
-                                    }
-                                    placeholder="Motif de l'écart (obligatoire)..."
-                                    className="w-full rounded border border-[#14232B] bg-[#F6F1E7] px-3 py-2 text-sm"
-                                  />
-                                )}
+                              {effectiveCount !== etape.nb_velos && (
+                                <input
+                                  type="text"
+                                  value={stepReason}
+                                  onChange={(e) =>
+                                    setStepReason(e.target.value)
+                                  }
+                                  placeholder="Motif de l'écart (obligatoire)..."
+                                  className="w-full rounded border border-[#14232B] bg-[#F6F1E7] px-3 py-2 text-sm"
+                                />
+                              )}
 
                               <button
                                 type="button"

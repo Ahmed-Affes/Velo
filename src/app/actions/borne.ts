@@ -20,7 +20,6 @@ export async function getBorneBootstrapAction(stationId?: number) {
 
   const activeStation =
     stations?.find((s) => s.id_station === stationId) ??
-    stations?.find((s) => s.nom.includes("El Ain")) ??
     stations?.[0] ??
     null;
 
@@ -196,6 +195,29 @@ export async function demarrerLocationAbonneAction(
   };
 }
 
+async function findDefaultTechnicianMatricule(
+  supabase: ReturnType<typeof getSupabaseAdmin>
+): Promise<number | null> {
+  const { data: tech } = await supabase
+    .from("personnel")
+    .select("matricule")
+    .eq("role", "TECHNICIEN")
+    .eq("actif", true)
+    .order("matricule")
+    .limit(1)
+    .maybeSingle();
+  if (tech?.matricule) return tech.matricule;
+
+  const { data: anyStaff } = await supabase
+    .from("personnel")
+    .select("matricule")
+    .eq("actif", true)
+    .order("matricule")
+    .limit(1)
+    .maybeSingle();
+  return anyStaff?.matricule ?? null;
+}
+
 export async function signalerVeloMauvaisEtatBorneAction(
   numSerie: string,
   motifs: string[],
@@ -214,18 +236,20 @@ export async function signalerVeloMauvaisEtatBorneAction(
     return { ok: false, error: restErr.message };
   }
 
-  // Créer une réclamation automatique rattachée au technicien de garde (2014)
-  const diagnostic =
-    motifs.length > 0
-      ? `Signalement usager à la borne : ${motifs.join(", ")}`
-      : "Signalement usager à la borne : vélo en mauvais état";
+  const techMat = await findDefaultTechnicianMatricule(supabase);
+  if (techMat !== null) {
+    const diagnostic =
+      motifs.length > 0
+        ? `Signalement usager à la borne : ${motifs.join(", ")}`
+        : "Signalement usager à la borne : vélo en mauvais état";
 
-  await supabase.from("reclamations").insert({
-    num_serie: numSerie,
-    matricule_technicien: 2014,
-    diagnostic,
-    traitee: false,
-  });
+    await supabase.from("reclamations").insert({
+      num_serie: numSerie,
+      matricule_technicien: techMat,
+      diagnostic,
+      traitee: false,
+    });
+  }
 
   return { ok: true };
 }
@@ -445,12 +469,15 @@ export async function restituerVeloAction(input: {
   }
 
   if (input.mauvaisEtat) {
-    await supabase.from("reclamations").insert({
-      num_serie: input.numSerie.toUpperCase(),
-      matricule_technicien: 2014,
-      diagnostic: "Vélo restitué en mauvais état par l'usager.",
-      traitee: false,
-    });
+    const techMat = await findDefaultTechnicianMatricule(supabase);
+    if (techMat !== null) {
+      await supabase.from("reclamations").insert({
+        num_serie: input.numSerie.toUpperCase(),
+        matricule_technicien: techMat,
+        diagnostic: "Vélo restitué en mauvais état par l'usager.",
+        traitee: false,
+      });
+    }
   }
 
   const differentStationWarning =

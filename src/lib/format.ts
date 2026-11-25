@@ -69,7 +69,7 @@ export function calcOccasionnelAmounts(dureeMinutes: number): {
   garantie: number;
   total: number;
 } {
-  // Barème démo transparent : 1,500 DT / 30 min + garantie fixe 30,000 DT
+  // Barème tarifaire : 1,500 DT / 30 min + garantie fixe 30,000 DT
   const halfHours = Math.max(1, Math.ceil(dureeMinutes / 30));
   const frais = Number((halfHours * 1.5).toFixed(3));
   const garantie = 30.0;

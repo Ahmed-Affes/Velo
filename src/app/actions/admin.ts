@@ -608,6 +608,74 @@ export async function rouvrirReparationAction(idReparation: number) {
   return { ok: true };
 }
 
+async function validateMissionResources(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  params: {
+    matriculeTechnicien: number;
+    immatriculationCamion: string;
+    dateMission: string;
+    excludeOrdreId?: number;
+  }
+): Promise<{ ok: true; truckCap: number } | { ok: false; error: string }> {
+  const [{ data: tech }, { data: cam }, { data: activeOrders }] =
+    await Promise.all([
+      supabase
+        .from("personnel")
+        .select("matricule, role, actif")
+        .eq("matricule", params.matriculeTechnicien)
+        .maybeSingle(),
+      supabase
+        .from("camions")
+        .select("immatriculation, capacite, disponible")
+        .eq("immatriculation", params.immatriculationCamion)
+        .maybeSingle(),
+      supabase
+        .from("ordres_mission")
+        .select("id_ordre, matricule_technicien, immatriculation_camion")
+        .eq("date_mission", params.dateMission)
+        .in("statut", ["NON_DEMARRE", "EN_COURS"]),
+    ]);
+
+  if (!tech || tech.role !== "TECHNICIEN" || !tech.actif) {
+    return {
+      ok: false,
+      error: "Technicien introuvable ou indisponible (inactif).",
+    };
+  }
+  if (!cam) {
+    return { ok: false, error: "Camion introuvable." };
+  }
+  if (!cam.disponible) {
+    return {
+      ok: false,
+      error: `Le camion ${cam.immatriculation} est actuellement indisponible.`,
+    };
+  }
+
+  const conflicts = (activeOrders ?? []).filter(
+    (o) => o.id_ordre !== params.excludeOrdreId
+  );
+  if (
+    conflicts.some((o) => o.matricule_technicien === params.matriculeTechnicien)
+  ) {
+    return {
+      ok: false,
+      error:
+        "Ce technicien a déjà une mission active prévue à cette date. Choisissez un autre technicien.",
+    };
+  }
+  if (
+    conflicts.some((o) => o.immatriculation_camion === params.immatriculationCamion)
+  ) {
+    return {
+      ok: false,
+      error: `Le camion ${cam.immatriculation} est déjà affecté à une mission active à cette date. Choisissez un autre camion.`,
+    };
+  }
+
+  return { ok: true, truckCap: cam.capacite ?? 12 };
+}
+
 export async function createItineraireEtMissionAction(input: {
   dateItineraire: string;
   brouillon: boolean;
@@ -624,6 +692,19 @@ export async function createItineraireEtMissionAction(input: {
 
   const supabase = getSupabaseAdmin();
 
+  let truckCap = 999;
+  if (input.mission) {
+    const resCheck = await validateMissionResources(supabase, {
+      matriculeTechnicien: input.mission.matriculeTechnicien,
+      immatriculationCamion: input.mission.immatriculationCamion,
+      dateMission: input.dateItineraire,
+    });
+    if (!resCheck.ok) {
+      return { ok: false, error: resCheck.error };
+    }
+    truckCap = resCheck.truckCap;
+  }
+
   // Simulation étape par étape : vérifie qu'aucune station ne passe < 0 ou > capacité
   const { data: stationsRows } = await supabase
     .from("stations")
@@ -633,15 +714,6 @@ export async function createItineraireEtMissionAction(input: {
   );
 
   let truckLoad = 0;
-  let truckCap = 999;
-  if (input.mission?.immatriculationCamion) {
-    const { data: cam } = await supabase
-      .from("camions")
-      .select("capacite")
-      .eq("immatriculation", input.mission.immatriculationCamion)
-      .maybeSingle();
-    if (cam?.capacite) truckCap = cam.capacite;
-  }
 
   for (let i = 0; i < input.etapes.length; i++) {
     const step = input.etapes[i];
@@ -750,6 +822,17 @@ export async function updateOrdreMissionAction(input: {
 }) {
   await requireRole(["RESPONSABLE"]);
   const supabase = getSupabaseAdmin();
+  if (input.statut === "NON_DEMARRE" || input.statut === "EN_COURS") {
+    const resCheck = await validateMissionResources(supabase, {
+      matriculeTechnicien: input.matriculeTechnicien,
+      immatriculationCamion: input.immatriculationCamion,
+      dateMission: input.dateMission,
+      excludeOrdreId: input.idOrdre,
+    });
+    if (!resCheck.ok) {
+      return { ok: false, error: resCheck.error };
+    }
+  }
   const { error } = await supabase
     .from("ordres_mission")
     .update({

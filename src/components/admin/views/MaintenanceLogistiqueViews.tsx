@@ -183,7 +183,7 @@ export function PlanifierReparationView({
   onDone: () => Promise<void>;
 }) {
   const techs = personnel.filter((p) => p.role === "TECHNICIEN" && p.actif);
-  const [techMat, setTechMat] = useState<number>(techs[0]?.matricule ?? 2014);
+  const [techMat, setTechMat] = useState<number>(techs[0]?.matricule ?? 0);
   const [datePlan, setDatePlan] = useState(
     new Date().toISOString().slice(0, 10)
   );
@@ -259,6 +259,7 @@ export function PlanifierReparationView({
 
       <button
         type="button"
+        disabled={techMat <= 0}
         onClick={async () => {
           setErr(null);
           const r = await planifierReparationAction({
@@ -375,27 +376,27 @@ export function ItinerairesView({
   const [etapes, setEtapes] = useState(
     initialEtapes && initialEtapes.length > 0
       ? initialEtapes
-      : [
+      : stations.length > 0
+      ? [
           {
             action: "PRENDRE" as const,
             idStation:
               stations.find((s) => s.nb_velos_actuel > 0)?.id_station ??
-              stations[0]?.id_station ??
-              1,
+              stations[0].id_station,
             nbVelos: 2,
           },
           {
             action: "DEPOSER" as const,
             idStation:
               stations.find((s) => s.nb_velos_actuel < s.capacite)?.id_station ??
-              stations[0]?.id_station ??
-              1,
+              stations[0].id_station,
             nbVelos: 2,
           },
         ]
+      : []
   );
   const [techMat, setTechMat] = useState<number>(
-    personnel.find((p) => p.role === "TECHNICIEN" && p.actif)?.matricule ?? 2014
+    personnel.find((p) => p.role === "TECHNICIEN" && p.actif)?.matricule ?? 0
   );
   const [camionImm, setCamionImm] = useState<string>(
     camions.find((c) => c.disponible)?.immatriculation ?? ""
@@ -495,7 +496,7 @@ export function ItinerairesView({
                   ...prev,
                   {
                     action: "DEPOSER",
-                    idStation: stations[0]?.id_station ?? 1,
+                    idStation: stations[0]?.id_station ?? 0,
                     nbVelos: 1,
                   },
                 ])
@@ -630,7 +631,7 @@ export function ItinerairesView({
             </button>
             <button
               type="button"
-              disabled={!isRouteValid || !camionImm}
+              disabled={!isRouteValid || !camionImm || techMat <= 0}
               onClick={async () => {
                 setErr(null);
                 const r = await createItineraireEtMissionAction({
@@ -716,7 +717,7 @@ export function OrdresMissionView({
   const [editOrdre, setEditOrdre] = useState<OrdreMission | null>(null);
   const [deleteOrdre, setDeleteOrdre] = useState<OrdreMission | null>(null);
 
-  const [editTech, setEditTech] = useState<number>(2014);
+  const [editTech, setEditTech] = useState<number>(0);
   const [editCamion, setEditCamion] = useState<string>("");
   const [editDate, setEditDate] = useState<string>("");
   const [editStatut, setEditStatut] =
@@ -1064,11 +1065,11 @@ export function CamionsView({
   onRefresh: () => Promise<void>;
 }) {
   const [plate, setPlate] = useState("");
-  const [modele, setModele] = useState("Renault Master L2H2");
-  const [capacite, setCapacite] = useState(14);
+  const [modele, setModele] = useState("");
+  const [capacite, setCapacite] = useState(12);
   const [kilometrage, setKilometrage] = useState(0);
   const [idEntrepot, setIdEntrepot] = useState<number>(
-    entrepots[0]?.id_entrepot ?? 1
+    entrepots[0]?.id_entrepot ?? 0
   );
 
   const [editing, setEditing] = useState<Camion | null>(null);
@@ -1077,10 +1078,10 @@ export function CamionsView({
   function startEdit(c: Camion) {
     setEditing(c);
     setPlate(c.immatriculation);
-    setModele(c.modele ?? "Renault Master L2H2");
+    setModele(c.modele ?? "");
     setCapacite(c.capacite ?? 12);
     setKilometrage(c.kilometrage ?? 0);
-    setIdEntrepot(c.id_entrepot ?? entrepots[0]?.id_entrepot ?? 1);
+    setIdEntrepot(c.id_entrepot ?? entrepots[0]?.id_entrepot ?? 0);
     setErr(null);
   }
 
@@ -1103,7 +1104,7 @@ export function CamionsView({
               modele,
               capacite,
               kilometrage,
-              idEntrepot,
+              idEntrepot: idEntrepot || null,
               disponible: editing.disponible,
             });
             if (!r.ok) {
@@ -1121,7 +1122,7 @@ export function CamionsView({
               modele,
               capacite,
               kilometrage,
-              idEntrepot,
+              idEntrepot: idEntrepot || null,
             });
             if (!r.ok) {
               setErr(r.error ?? "Erreur");
@@ -1129,8 +1130,8 @@ export function CamionsView({
             }
           }
           setPlate("");
-          setModele("Renault Master L2H2");
-          setCapacite(14);
+          setModele("");
+          setCapacite(12);
           setKilometrage(0);
           await onRefresh();
         }}
@@ -1138,7 +1139,7 @@ export function CamionsView({
       >
         <input
           type="text"
-          placeholder="123 TUN 4567"
+          placeholder="XXX TUN XXXX"
           value={plate}
           disabled={Boolean(editing)}
           onChange={(e) => setPlate(e.target.value.toUpperCase())}
@@ -1147,7 +1148,7 @@ export function CamionsView({
         />
         <input
           type="text"
-          placeholder="Modèle"
+          placeholder="Modèle (ex. Renault Master)"
           value={modele}
           onChange={(e) => setModele(e.target.value)}
           required
@@ -1176,6 +1177,7 @@ export function CamionsView({
           onChange={(e) => setIdEntrepot(Number(e.target.value))}
           className="rounded border border-[#14232B] bg-[#F6F1E7] px-2.5 py-2 text-sm"
         >
+          <option value={0}>Aucun entrepôt</option>
           {entrepots.map((e) => (
             <option key={e.id_entrepot} value={e.id_entrepot}>
               {e.nom}

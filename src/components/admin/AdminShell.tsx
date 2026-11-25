@@ -280,7 +280,7 @@ export function AdminShell({
               type="text"
               value={globalSearch}
               onChange={(e) => setGlobalSearch(e.target.value)}
-              placeholder="Recherche globale : VSF-000412, CIN, matricule..."
+              placeholder="Recherche globale : VSF-XXXXXX, CIN, matricule..."
               className="w-full rounded-[6px] border-[1.5px] border-[#14232B] bg-[#F6F1E7] py-1.5 pl-9 pr-3 font-mono-sfax text-sm"
             />
           </form>
@@ -362,23 +362,28 @@ export function AdminShell({
               onAcquerir={() => setRoute("R5")}
             />
           )}
-          {route === "R4" && activeVelo && (
-            <FicheVeloView
-              velo={activeVelo}
-              types={data.types}
-              fournisseurs={data.fournisseurs}
-              stations={data.stations}
-              locations={data.locations}
-              reclamations={data.reclamations}
-              reparations={data.reparations}
-              onBack={() => setRoute("R3")}
-              onRefresh={refresh}
-              onNavigatePlanifier={(idRec) => {
-                setSelectedRecId(idRec);
-                setRoute("R10");
-              }}
-            />
-          )}
+          {route === "R4" &&
+            (activeVelo ? (
+              <FicheVeloView
+                velo={activeVelo}
+                types={data.types}
+                fournisseurs={data.fournisseurs}
+                stations={data.stations}
+                locations={data.locations}
+                reclamations={data.reclamations}
+                reparations={data.reparations}
+                onBack={() => setRoute("R3")}
+                onRefresh={refresh}
+                onNavigatePlanifier={(idRec) => {
+                  setSelectedRecId(idRec);
+                  setRoute("R10");
+                }}
+              />
+            ) : (
+              <div className="card-sfax p-8 text-center text-base text-[#14232B]/75">
+                Aucun vélo sélectionné ou enregistré dans le parc.
+              </div>
+            ))}
           {route === "R5" && (
             <AcquerirVeloView
               types={data.types}
@@ -418,17 +423,22 @@ export function AdminShell({
               }}
             />
           )}
-          {route === "R10" && activeRec && (
-            <PlanifierReparationView
-              reclamation={activeRec}
-              personnel={data.personnel}
-              reparations={data.reparations}
-              onDone={async () => {
-                await refresh();
-                setRoute("R11");
-              }}
-            />
-          )}
+          {route === "R10" &&
+            (activeRec ? (
+              <PlanifierReparationView
+                reclamation={activeRec}
+                personnel={data.personnel}
+                reparations={data.reparations}
+                onDone={async () => {
+                  await refresh();
+                  setRoute("R11");
+                }}
+              />
+            ) : (
+              <div className="card-sfax p-8 text-center text-base text-[#14232B]/75">
+                Aucune réclamation disponible à planifier.
+              </div>
+            ))}
           {route === "R11" && (
             <ReparationsView
               reparations={data.reparations}

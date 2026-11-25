@@ -169,6 +169,7 @@ export async function executerEtapeMissionAction(input: {
       .from("velos")
       .select("num_serie")
       .eq("immatriculation_camion", ordre.immatriculation_camion)
+      .eq("etat", "DISPONIBLE")
       .limit(input.nbVelosReel);
 
     for (let i = 0; i < (truckBikes?.length ?? 0); i++) {
@@ -192,6 +193,110 @@ export async function executerEtapeMissionAction(input: {
     })
     .eq("id_etape", input.idEtape);
 
+  return { ok: true };
+}
+
+export async function recupererVeloEnPanneMissionAction(input: {
+  idOrdre: number;
+  numSerie: string;
+}) {
+  await requireRole(["TECHNICIEN", "RESPONSABLE"]);
+  const supabase = getSupabaseAdmin();
+
+  const [{ data: ordre }, { data: velo }] = await Promise.all([
+    supabase.from("ordres_mission").select("*").eq("id_ordre", input.idOrdre).single(),
+    supabase.from("velos").select("*").eq("num_serie", input.numSerie).single(),
+  ]);
+
+  if (!ordre) return { ok: false, error: "Ordre de mission introuvable." };
+  if (ordre.statut === "TERMINE" || ordre.statut === "ANNULE") {
+    return { ok: false, error: "Cette mission est déjà clôturée ou annulée." };
+  }
+  if (!velo) return { ok: false, error: "Vélo introuvable." };
+  if (velo.etat !== "EN_PANNE" || !velo.id_station) {
+    return {
+      ok: false,
+      error: "Ce vélo n'est pas en panne en station.",
+    };
+  }
+
+  const [{ data: cam }, { count: aboardCount }] = await Promise.all([
+    supabase
+      .from("camions")
+      .select("capacite")
+      .eq("immatriculation", ordre.immatriculation_camion)
+      .maybeSingle(),
+    supabase
+      .from("velos")
+      .select("*", { count: "exact", head: true })
+      .eq("immatriculation_camion", ordre.immatriculation_camion),
+  ]);
+
+  const maxCap = cam?.capacite ?? 12;
+  if ((aboardCount ?? 0) >= maxCap) {
+    return {
+      ok: false,
+      error: `Le camion ${ordre.immatriculation_camion} est plein (${aboardCount}/${maxCap}).`,
+    };
+  }
+
+  if (ordre.statut === "NON_DEMARRE") {
+    await supabase
+      .from("ordres_mission")
+      .update({ statut: "EN_COURS" })
+      .eq("id_ordre", input.idOrdre);
+  }
+
+  const { error } = await supabase
+    .from("velos")
+    .update({
+      id_station: null,
+      emplacement_dock: null,
+      immatriculation_camion: ordre.immatriculation_camion,
+    })
+    .eq("num_serie", input.numSerie);
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+export async function dechargerVeloAtelierAction(input: {
+  idOrdre: number;
+  numSerie: string;
+}) {
+  await requireRole(["TECHNICIEN", "RESPONSABLE"]);
+  const supabase = getSupabaseAdmin();
+
+  const { data: ordre } = await supabase
+    .from("ordres_mission")
+    .select("immatriculation_camion")
+    .eq("id_ordre", input.idOrdre)
+    .single();
+
+  if (!ordre) return { ok: false, error: "Ordre de mission introuvable." };
+
+  const { data: velo } = await supabase
+    .from("velos")
+    .select("etat, immatriculation_camion")
+    .eq("num_serie", input.numSerie)
+    .single();
+
+  if (!velo || velo.immatriculation_camion !== ordre.immatriculation_camion) {
+    return { ok: false, error: "Ce vélo n'est pas à bord de ce camion." };
+  }
+  if (velo.etat !== "EN_PANNE" && velo.etat !== "EN_REPARATION") {
+    return {
+      ok: false,
+      error: "Seuls les vélos en panne ou en réparation peuvent être déchargés à l'atelier.",
+    };
+  }
+
+  const { error } = await supabase
+    .from("velos")
+    .update({ immatriculation_camion: null })
+    .eq("num_serie", input.numSerie);
+
+  if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
 

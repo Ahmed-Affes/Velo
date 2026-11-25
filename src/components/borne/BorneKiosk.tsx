@@ -92,9 +92,8 @@ export function BorneKiosk({
   const [nowStr, setNowStr] = useState<string>("");
   const [inactivitySec, setInactivitySec] = useState(60);
 
-  // Demo hardware toggles
-  const [simLecteurPanne, setSimLecteurPanne] = useState(false);
-  const [simHorsService, setSimHorsService] = useState(false);
+  const isLecteurPanne = Boolean(activeStation?.lecteur_en_panne);
+  const isHorsService = Boolean(activeStation?.borne_hors_service);
 
   // K2 & K3 Abonné state
   const [cardInput, setCardInput] = useState("");
@@ -167,6 +166,7 @@ export function BorneKiosk({
     garantie: number;
   } | null>(null);
   const [showKeyboard, setShowKeyboard] = useState(false);
+  const [rentalFlow, setRentalFlow] = useState<"ABONNE" | "OCCASIONNEL">("ABONNE");
 
   const [busy, setBusy] = useState(false);
 
@@ -197,6 +197,8 @@ export function BorneKiosk({
     setOccCinBlocked(null);
     setOccPayError(null);
     setOccCarteDelivree(null);
+    setRentalFlow("ABONNE");
+    setTypeFilter("ALL");
     setInactivitySec(60);
 
     if (activeStation) {
@@ -375,12 +377,8 @@ export function BorneKiosk({
     }
   }
 
-  async function handlePayOccasionnel(simulateError?: string) {
+  async function handlePayOccasionnel() {
     if (!activeStation) return;
-    if (simulateError) {
-      setOccPayError(simulateError);
-      return;
-    }
     const availableBike = bikes.find(
       (b) => !hiddenFaultySerials.includes(b.num_serie)
     );
@@ -390,28 +388,44 @@ export function BorneKiosk({
     }
     setOccPaying(true);
     setOccPayError(null);
+    setCardError(null);
+    setConfirmBike(null);
+    setRentalFlow("OCCASIONNEL");
+    setOccPaying(false);
+    setScreen("K5");
+  }
+
+  async function handleConfirmBikeOccasionnel(bike: BikeItem) {
+    if (!activeStation) return;
+    setBusy(true);
+    setCardError(null);
     const res = await demarrerLocationOccasionnelAction({
       nom: occNom,
       prenom: occPrenom,
       cin: occCin,
       tel: occTel,
       idStationDepart: activeStation.id_station,
-      idStationDest: occDestId || stations.find((s) => s.id_station !== activeStation.id_station)?.id_station || 1,
+      idStationDest:
+        occDestId ||
+        stations.find((s) => s.id_station !== activeStation.id_station)
+          ?.id_station ||
+        activeStation.id_station,
       dureeMinutes: occDuree,
       modePaiement: occPaymentMethod,
-      numSerie: availableBike.num_serie,
+      numSerie: bike.num_serie,
     });
-    setOccPaying(false);
+    setBusy(false);
 
     if (!res.ok) {
-      setOccPayError(res.error ?? "Paiement refusé.");
+      setCardError(res.error ?? "Erreur lors de la création de la carte.");
       return;
     }
 
+    setConfirmBike(null);
     setOccCarteDelivree({
       numCarte: res.numCarte!,
       referencePaiement: res.referencePaiement!,
-      numSerie: availableBike.num_serie,
+      numSerie: bike.num_serie,
       dock: res.emplacement ?? 1,
       frais: res.frais ?? 0,
       garantie: res.garantie ?? 30,
@@ -487,44 +501,30 @@ export function BorneKiosk({
               <span className="font-mono-sfax rounded bg-[#0E5A6B] px-2 py-0.5 text-xs font-semibold text-white">
                 BORNE VÉLOSF
               </span>
-              <select
-                aria-label="Choisir une station"
-                value={activeStation?.id_station ?? ""}
-                onChange={(e) => switchStation(Number(e.target.value))}
-                className="rounded border border-[#14232B] bg-[#F6F1E7] px-2 py-1 font-heading text-base font-semibold"
-              >
-                {stations.map((s) => (
-                  <option key={s.id_station} value={s.id_station}>
-                    {s.nom}
-                  </option>
-                ))}
-              </select>
+              {stations.length > 0 && (
+                <select
+                  aria-label="Choisir une station"
+                  value={activeStation?.id_station ?? ""}
+                  onChange={(e) => switchStation(Number(e.target.value))}
+                  className="rounded border border-[#14232B] bg-[#F6F1E7] px-2 py-1 font-heading text-base font-semibold"
+                >
+                  {stations.map((s) => (
+                    <option key={s.id_station} value={s.id_station}>
+                      {s.nom}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
             <p className="mt-0.5 text-sm text-[#14232B]/75">
-              {activeStation?.adresse}
+              {activeStation?.adresse ?? "Aucune station configurée"}
             </p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-1.5 text-xs font-mono-sfax">
-            <input
-              type="checkbox"
-              checked={simLecteurPanne}
-              onChange={(e) => setSimLecteurPanne(e.target.checked)}
-            />
-            Lecteur HS
-          </label>
-          <label className="flex items-center gap-1.5 text-xs font-mono-sfax">
-            <input
-              type="checkbox"
-              checked={simHorsService}
-              onChange={(e) => setSimHorsService(e.target.checked)}
-            />
-            Borne HS
-          </label>
           <div className="rounded-[6px] border-[1.5px] border-[#14232B] bg-[#F6F1E7] px-3 py-1.5 font-mono-sfax text-lg font-semibold">
-            {nowStr || "20:00:00"}
+            {nowStr || "00:00:00"}
           </div>
         </div>
       </header>
@@ -546,10 +546,29 @@ export function BorneKiosk({
 
       {/* Corps principal */}
       <main className="mx-auto my-4 w-full max-w-6xl flex-1">
+        {!activeStation ? (
+          <div className="card-sfax mx-auto max-w-2xl p-10 text-center">
+            <Bike className="mx-auto h-14 w-14 text-[#0E5A6B]" />
+            <h2 className="mt-4 text-3xl font-bold">
+              Aucune station configurée
+            </h2>
+            <p className="mt-2 text-base text-[#14232B]/75">
+              Ajoutez au moins une station depuis le back-office Responsable
+              pour activer la borne.
+            </p>
+            <Link
+              href="/admin"
+              className="btn-sfax-primary mt-6 inline-flex min-h-[56px] items-center px-6 text-base"
+            >
+              Accéder au back-office
+            </Link>
+          </div>
+        ) : (
+        <>
         {/* K1 : ACCUEIL DE LA STATION */}
         {screen === "K1" && (
           <div className="space-y-4">
-            {simHorsService ? (
+            {isHorsService ? (
               <div className="card-sfax border-[#C8553D] bg-[#C8553D]/10 p-10 text-center">
                 <Wrench className="mx-auto h-14 w-14 text-[#C8553D]" />
                 <h2 className="mt-4 text-3xl font-bold">
@@ -642,7 +661,7 @@ export function BorneKiosk({
 
                   {/* Centre droit : 3 gros boutons tactiles >= 64px */}
                   <div className="flex flex-col justify-center gap-4">
-                    {simLecteurPanne ? (
+                    {isLecteurPanne ? (
                       <div className="card-sfax-flat border-[#C8553D] bg-[#C8553D]/10 p-5 text-base">
                         <strong>Lecteur optique en panne :</strong> la lecture
                         de carte d&apos;adhésion est temporairement indisponible.
@@ -652,7 +671,10 @@ export function BorneKiosk({
                       <button
                         type="button"
                         disabled={isStationVide}
-                        onClick={() => setScreen("K2")}
+                        onClick={() => {
+                          setRentalFlow("ABONNE");
+                          setScreen("K2");
+                        }}
                         className="btn-sfax-primary flex min-h-[84px] items-center justify-between px-7 text-left text-2xl font-bold"
                       >
                         <span className="flex items-center gap-4">
@@ -668,7 +690,10 @@ export function BorneKiosk({
                     <button
                       type="button"
                       disabled={isStationVide}
-                      onClick={() => setScreen("K8")}
+                      onClick={() => {
+                        setRentalFlow("OCCASIONNEL");
+                        setScreen("K8");
+                      }}
                       className="btn-sfax-mer flex min-h-[84px] items-center justify-between px-7 text-left text-2xl font-bold disabled:opacity-50"
                     >
                       <span className="flex items-center gap-4">
@@ -721,7 +746,7 @@ export function BorneKiosk({
               Passez votre carte devant le lecteur
             </h2>
             <p className="mt-2 text-lg text-[#14232B]/75">
-              Ou saisissez le numéro de carte d&apos;adhésion pour simuler la lecture.
+              Ou saisissez votre numéro de carte d&apos;adhésion.
             </p>
 
             {cardError && (
@@ -737,7 +762,7 @@ export function BorneKiosk({
                 inputMode="numeric"
                 value={cardInput}
                 onChange={(e) => setCardInput(e.target.value)}
-                placeholder="Ex: 10001"
+                placeholder="N° de carte"
                 className="flex-1 rounded-[6px] border-[1.5px] border-[#14232B] bg-[#F6F1E7] px-4 py-4 font-mono-sfax text-2xl"
               />
               <button
@@ -747,30 +772,6 @@ export function BorneKiosk({
                 className="btn-sfax-primary min-h-[64px] px-7 text-xl"
               >
                 {busy ? "Lecture..." : "Lire"}
-              </button>
-            </div>
-
-            <div className="mt-6 flex flex-wrap justify-center gap-2 border-t border-dotted border-[#0E5A6B]/40 pt-4">
-              <button
-                type="button"
-                onClick={() => handleCheckCard("10001")}
-                className="rounded border border-[#14232B] bg-[#F6F1E7] px-3 py-2 font-mono-sfax text-sm hover:bg-[#E3D9C6]"
-              >
-                Carte #10001 (Mohamed · PIN 1234)
-              </button>
-              <button
-                type="button"
-                onClick={() => handleCheckCard("10002")}
-                className="rounded border border-[#14232B] bg-[#F6F1E7] px-3 py-2 font-mono-sfax text-sm hover:bg-[#E3D9C6]"
-              >
-                Carte #10002 (Amira · location en cours)
-              </button>
-              <button
-                type="button"
-                onClick={() => handleCheckCard("99999")}
-                className="rounded border border-[#14232B] bg-[#F6F1E7] px-3 py-2 font-mono-sfax text-sm hover:bg-[#E3D9C6]"
-              >
-                Carte inconnue
               </button>
             </div>
           </div>
@@ -944,6 +945,12 @@ export function BorneKiosk({
         {/* K5 : CHOIX DU VÉLO */}
         {screen === "K5" && (
           <div className="space-y-4">
+            {cardError && (
+              <div className="rounded-[6px] border-[1.5px] border-[#C8553D] bg-[#C8553D]/12 p-4 text-base text-[#9B3925]">
+                <AlertTriangle className="mr-2 inline h-5 w-5" />
+                {cardError}
+              </div>
+            )}
             <div className="flex flex-wrap items-center justify-between gap-4">
               <h2 className="text-3xl font-bold">Choisissez votre vélo</h2>
               <div className="flex flex-wrap gap-2">
@@ -1054,7 +1061,11 @@ export function BorneKiosk({
                     <button
                       type="button"
                       disabled={busy}
-                      onClick={() => handleConfirmBikeAbonne(confirmBike)}
+                      onClick={() =>
+                        rentalFlow === "OCCASIONNEL"
+                          ? handleConfirmBikeOccasionnel(confirmBike)
+                          : handleConfirmBikeAbonne(confirmBike)
+                      }
                       className="btn-sfax-primary min-h-[64px] px-8 text-xl"
                     >
                       {busy ? "Déblocage..." : "Confirmer"}
@@ -1207,7 +1218,7 @@ export function BorneKiosk({
                     onChange={(e) =>
                       setReturnSerial(e.target.value.toUpperCase())
                     }
-                    placeholder="VSF-000412"
+                    placeholder="VSF-XXXXXX"
                     className="mt-1.5 w-full rounded-[6px] border-[1.5px] border-[#14232B] bg-[#F6F1E7] px-4 py-4 font-mono-sfax text-2xl"
                   />
                 </div>
@@ -1313,7 +1324,7 @@ export function BorneKiosk({
                     inputMode="numeric"
                     value={occCin}
                     onChange={(e) => handleCinChange(e.target.value)}
-                    placeholder="09876543"
+                    placeholder="8 chiffres"
                     className="mt-1 w-full rounded-[6px] border-[1.5px] border-[#14232B] bg-[#F6F1E7] px-3 py-3 font-mono-sfax text-lg"
                   />
                 </div>
@@ -1336,7 +1347,7 @@ export function BorneKiosk({
                     type="text"
                     value={occNom}
                     onChange={(e) => setOccNom(e.target.value)}
-                    placeholder="Kammoun"
+                    placeholder="Nom"
                     className="mt-1 w-full rounded-[6px] border-[1.5px] border-[#14232B] bg-[#F6F1E7] px-3 py-3 text-lg"
                   />
                 </div>
@@ -1346,7 +1357,7 @@ export function BorneKiosk({
                     type="text"
                     value={occPrenom}
                     onChange={(e) => setOccPrenom(e.target.value)}
-                    placeholder="Salma"
+                    placeholder="Prénom"
                     className="mt-1 w-full rounded-[6px] border-[1.5px] border-[#14232B] bg-[#F6F1E7] px-3 py-3 text-lg"
                   />
                 </div>
@@ -1533,15 +1544,6 @@ export function BorneKiosk({
               >
                 Valider le paiement ({formatDT(occAmounts.total)})
               </button>
-              <button
-                type="button"
-                onClick={() =>
-                  handlePayOccasionnel("Paiement refusé : fonds insuffisants.")
-                }
-                className="btn-sfax-outline min-h-[64px] px-4 text-sm"
-              >
-                Simuler refus
-              </button>
             </div>
           </div>
         )}
@@ -1602,7 +1604,7 @@ export function BorneKiosk({
                       onChange={(e) =>
                         setReturnSerial(e.target.value.toUpperCase())
                       }
-                      placeholder="VSF-000401"
+                      placeholder="VSF-XXXXXX"
                       className="mt-1 w-full rounded-[6px] border-[1.5px] border-[#14232B] bg-[#F6F1E7] px-4 py-3 font-mono-sfax text-xl"
                     />
                   </div>
@@ -1615,7 +1617,7 @@ export function BorneKiosk({
                       inputMode="numeric"
                       value={returnCardNum}
                       onChange={(e) => setReturnCardNum(e.target.value)}
-                      placeholder="Ex: 1"
+                      placeholder="N° de carte"
                       className="mt-1 w-full rounded-[6px] border-[1.5px] border-[#14232B] bg-[#F6F1E7] px-4 py-3 font-mono-sfax text-xl"
                     />
                   </div>
@@ -1689,6 +1691,8 @@ export function BorneKiosk({
               </div>
             )}
           </div>
+        )}
+        </>
         )}
       </main>
 

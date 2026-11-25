@@ -303,6 +303,7 @@ export function StationsView({
                 onChange={(e) => setIdEntrepot(Number(e.target.value))}
                 className="flex-1 rounded border border-[#14232B] bg-[#F6F1E7] px-2 py-2 text-sm"
               >
+                <option value={0}>Aucun entrepôt</option>
                 {entrepots.map((e) => (
                   <option key={e.id_entrepot} value={e.id_entrepot}>
                     {e.nom}
@@ -976,12 +977,13 @@ export function AcquerirVeloView({
 }) {
   const [step, setStep] = useState(0);
   const [seriesMode, setSeriesMode] = useState(false);
-  const [serialInput, setSerialInput] = useState("VSF-000501");
+  const [serialInput, setSerialInput] = useState("");
   const [couleur, setCouleur] = useState(COULEURS[0]);
-  const [idType, setIdType] = useState<number>(types[0]?.id_type ?? 1);
+  const [idType, setIdType] = useState<number>(types[0]?.id_type ?? 0);
   const [dateAcq, setDateAcq] = useState(new Date().toISOString().slice(0, 10));
+  const activeFournisseurs = fournisseurs.filter((f) => !f.archive);
   const [idFournisseur, setIdFournisseur] = useState<number>(
-    fournisseurs[0]?.id_fournisseur ?? 1
+    activeFournisseurs[0]?.id_fournisseur ?? 0
   );
   const [showNewFourn, setShowNewFourn] = useState(false);
   const [newFNom, setNewFNom] = useState("");
@@ -991,7 +993,7 @@ export function AcquerirVeloView({
   const [idStation, setIdStation] = useState<number>(
     stations.find((s) => s.nb_velos_actuel < s.capacite)?.id_station ??
       stations[0]?.id_station ??
-      1
+      0
   );
   const [isReplacement, setIsReplacement] = useState(false);
   const [replaceSerial, setReplaceSerial] = useState("");
@@ -1028,7 +1030,7 @@ export function AcquerirVeloView({
     setMsg(`${res.created?.length ?? 1} vélo(s) enregistré(s) avec succès.`);
     await onDone();
     if (addAnother) {
-      setSerialInput("VSF-");
+      setSerialInput("");
       setStep(0);
     }
   }
@@ -1078,7 +1080,7 @@ export function AcquerirVeloView({
                   rows={3}
                   value={serialInput}
                   onChange={(e) => setSerialInput(e.target.value)}
-                  placeholder="VSF-000501, VSF-000502..."
+                  placeholder="VSF-000001, VSF-000002..."
                   className="w-full rounded border border-[#14232B] bg-[#F6F1E7] p-3 font-mono-sfax text-sm"
                 />
               ) : (
@@ -1087,6 +1089,7 @@ export function AcquerirVeloView({
                     type="text"
                     value={serialInput}
                     onChange={(e) => setSerialInput(e.target.value.toUpperCase())}
+                    placeholder="VSF-000001"
                     className="w-full rounded border border-[#14232B] bg-[#F6F1E7] px-3 py-2 font-mono-sfax text-base"
                   />
                   <p className="mt-1 font-mono-sfax text-xs">
@@ -1109,6 +1112,9 @@ export function AcquerirVeloView({
                     onChange={(e) => setIdType(Number(e.target.value))}
                     className="mt-1 w-full rounded border border-[#14232B] bg-[#F6F1E7] px-3 py-2 text-sm"
                   >
+                    {types.length === 0 && (
+                      <option value={0}>Aucun type configuré</option>
+                    )}
                     {types.map((t) => (
                       <option key={t.id_type} value={t.id_type}>
                         {t.libelle}
@@ -1157,7 +1163,7 @@ export function AcquerirVeloView({
               <div className="flex justify-end">
                 <button
                   type="button"
-                  disabled={existsInDb}
+                  disabled={existsInDb || !serialInput.trim() || idType <= 0}
                   onClick={() => setStep(1)}
                   className="btn-sfax-primary px-6 py-2 text-sm"
                 >
@@ -1184,9 +1190,10 @@ export function AcquerirVeloView({
                 onChange={(e) => setIdFournisseur(Number(e.target.value))}
                 className="w-full rounded border border-[#14232B] bg-[#F6F1E7] px-3 py-2 text-sm"
               >
-                {fournisseurs
-                  .filter((f) => !f.archive)
-                  .map((f) => (
+                {activeFournisseurs.length === 0 && (
+                  <option value={0}>Aucun fournisseur — ajoutez-en un ci-dessus</option>
+                )}
+                {activeFournisseurs.map((f) => (
                     <option key={f.id_fournisseur} value={f.id_fournisseur}>
                       {f.nom} ({f.tel})
                     </option>
@@ -1248,6 +1255,7 @@ export function AcquerirVeloView({
                 </button>
                 <button
                   type="button"
+                  disabled={idFournisseur <= 0}
                   onClick={() => setStep(2)}
                   className="btn-sfax-primary px-6 py-2 text-sm"
                 >
@@ -1268,6 +1276,9 @@ export function AcquerirVeloView({
                   onChange={(e) => setIdStation(Number(e.target.value))}
                   className="mt-1 w-full rounded border border-[#14232B] bg-[#F6F1E7] px-3 py-2 text-sm"
                 >
+                  {stations.length === 0 && (
+                    <option value={0}>Aucune station configurée</option>
+                  )}
                   {stations.map((s) => {
                     const full = s.nb_velos_actuel >= s.capacite;
                     return (
@@ -1321,6 +1332,7 @@ export function AcquerirVeloView({
                 <div className="flex gap-2">
                   <button
                     type="button"
+                    disabled={idStation <= 0}
                     onClick={() => handleSave(true)}
                     className="btn-sfax-outline px-4 py-2 text-sm"
                   >
@@ -1328,6 +1340,7 @@ export function AcquerirVeloView({
                   </button>
                   <button
                     type="button"
+                    disabled={idStation <= 0}
                     onClick={() => handleSave(false)}
                     className="btn-sfax-primary px-6 py-2 text-sm"
                   >

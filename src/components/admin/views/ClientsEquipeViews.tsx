@@ -59,7 +59,11 @@ export function AbonnesView({
   const [prenom, setPrenom] = useState("");
   const [cin, setCin] = useState("");
   const [tel, setTel] = useState("+216 ");
-  const [exp, setExp] = useState("2027-12-31");
+  const [exp, setExp] = useState(() => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() + 1);
+    return d.toISOString().slice(0, 10);
+  });
   const [msg, setMsg] = useState<string | null>(null);
   const [createdPin, setCreatedPin] = useState<string | null>(null);
   const [hidePin, setHidePin] = useState(false);
@@ -610,12 +614,12 @@ export function PersonnelView({
   const [editing, setEditing] = useState<Personnel | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Personnel | null>(null);
 
-  const [matricule, setMatricule] = useState("2025");
+  const [matricule, setMatricule] = useState("");
   const [nom, setNom] = useState("");
   const [prenom, setPrenom] = useState("");
   const [tel, setTel] = useState("+216 ");
-  const [specialite, setSpecialite] = useState("Freins & transmission");
-  const [password, setPassword] = useState("Sfax2026!");
+  const [specialite, setSpecialite] = useState("");
+  const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [createdCreds, setCreatedCreds] = useState<{
     matricule: number;
@@ -634,7 +638,7 @@ export function PersonnelView({
     setNom(p.nom);
     setPrenom(p.prenom);
     setTel(p.tel);
-    setSpecialite(p.specialite ?? "Freins & transmission");
+    setSpecialite(p.specialite ?? "");
     setPassword("");
     setErr(null);
   }
@@ -642,12 +646,12 @@ export function PersonnelView({
   function startNew() {
     setEditing(null);
     setShowNew((v) => !v);
-    setMatricule(tab === "TECHNICIEN" ? "2025" : "1005");
+    setMatricule("");
     setNom("");
     setPrenom("");
     setTel("+216 ");
-    setSpecialite("Freins & transmission");
-    setPassword("Sfax2026!");
+    setSpecialite("");
+    setPassword("");
     setErr(null);
   }
 
