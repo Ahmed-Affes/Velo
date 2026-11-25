@@ -360,6 +360,7 @@ export function AdminShell({
                 setRoute("R4");
               }}
               onAcquerir={() => setRoute("R5")}
+              onRefresh={refresh}
             />
           )}
           {route === "R4" &&

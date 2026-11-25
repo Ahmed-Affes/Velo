@@ -481,6 +481,129 @@ export async function acquerirVelosAction(
   return { ok: created.length > 0, created, failures };
 }
 
+export async function updateVeloAction(input: {
+  numSerie: string;
+  couleur: string;
+  couleurHex: string;
+  idType: number;
+  idFournisseur: number;
+  dateAcquisition: string;
+  idStation: number | null;
+}) {
+  await requireRole(["RESPONSABLE"]);
+  const supabase = getSupabaseAdmin();
+
+  const { data: velo } = await supabase
+    .from("velos")
+    .select("*")
+    .eq("num_serie", input.numSerie)
+    .single();
+
+  if (!velo) return { ok: false, error: "Vélo introuvable." };
+  if (velo.etat === "LOUE") {
+    return {
+      ok: false,
+      error: "Impossible de modifier un vélo actuellement en cours de location.",
+    };
+  }
+  if (velo.etat === "REFORME") {
+    return {
+      ok: false,
+      error: "Impossible de modifier un vélo réformé.",
+    };
+  }
+
+  let nextStationId = velo.id_station;
+  let nextDock = velo.emplacement_dock;
+
+  if (!velo.immatriculation_camion && input.idStation !== velo.id_station) {
+    if (input.idStation === null) {
+      nextStationId = null;
+      nextDock = null;
+    } else {
+      const { data: st } = await supabase
+        .from("stations")
+        .select("capacite, nb_velos_actuel")
+        .eq("id_station", input.idStation)
+        .single();
+      if (!st) return { ok: false, error: "Station introuvable." };
+      if (st.nb_velos_actuel >= st.capacite) {
+        return {
+          ok: false,
+          error: "La station sélectionnée est pleine.",
+        };
+      }
+      nextStationId = input.idStation;
+      nextDock = st.nb_velos_actuel + 1;
+    }
+  }
+
+  const { error } = await supabase
+    .from("velos")
+    .update({
+      couleur: input.couleur,
+      couleur_hex: input.couleurHex,
+      id_type: input.idType,
+      id_fournisseur: input.idFournisseur,
+      date_acquisition: input.dateAcquisition,
+      id_station: velo.immatriculation_camion ? null : nextStationId,
+      emplacement_dock: velo.immatriculation_camion ? null : nextDock,
+    })
+    .eq("num_serie", input.numSerie);
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+export async function deleteVeloAction(numSerie: string) {
+  await requireRole(["RESPONSABLE"]);
+  const supabase = getSupabaseAdmin();
+
+  const { data: velo } = await supabase
+    .from("velos")
+    .select("etat")
+    .eq("num_serie", numSerie)
+    .single();
+
+  if (!velo) return { ok: false, error: "Vélo introuvable." };
+  if (velo.etat === "LOUE") {
+    return {
+      ok: false,
+      error: "Impossible de supprimer un vélo en cours de location.",
+    };
+  }
+
+  const [{ count: locs }, { count: recs }, { count: ctrls }] = await Promise.all([
+    supabase
+      .from("locations")
+      .select("*", { count: "exact", head: true })
+      .eq("num_serie", numSerie),
+    supabase
+      .from("reclamations")
+      .select("*", { count: "exact", head: true })
+      .eq("num_serie", numSerie),
+    supabase
+      .from("controles_journaliers")
+      .select("*", { count: "exact", head: true })
+      .eq("num_serie", numSerie),
+  ]);
+
+  if ((locs ?? 0) > 0 || (recs ?? 0) > 0 || (ctrls ?? 0) > 0) {
+    return {
+      ok: false,
+      error: `Suppression refusée : ce vélo est lié à ${locs ?? 0} location(s), ${recs ?? 0} réclamation(s) et ${ctrls ?? 0} contrôle(s). Utilisez « Réformer ce vélo ».`,
+    };
+  }
+
+  const { error } = await supabase
+    .from("velos")
+    .delete()
+    .eq("num_serie", numSerie);
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
 export async function reformerVeloAction(input: {
   numSerie: string;
   motif: MotifReforme;

@@ -43,6 +43,8 @@ import {
   updateFournisseurAction,
   archiveOrDeleteFournisseurAction,
   acquerirVelosAction,
+  updateVeloAction,
+  deleteVeloAction,
   reformerVeloAction,
 } from "@/app/actions/admin";
 
@@ -450,6 +452,191 @@ export function StationsView({
   );
 }
 
+function EditVeloModal({
+  velo,
+  types,
+  fournisseurs,
+  stations,
+  onClose,
+  onSaved,
+}: {
+  velo: Velo;
+  types: TypeVelo[];
+  fournisseurs: Fournisseur[];
+  stations: Station[];
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
+  const [couleurNom, setCouleurNom] = useState(velo.couleur);
+  const [couleurHex, setCouleurHex] = useState(velo.couleur_hex);
+  const [idType, setIdType] = useState(velo.id_type);
+  const [idFournisseur, setIdFournisseur] = useState(velo.id_fournisseur);
+  const [dateAcq, setDateAcq] = useState(velo.date_acquisition);
+  const [idStation, setIdStation] = useState<number>(velo.id_station ?? 0);
+  const [err, setErr] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setErr(null);
+    setSaving(true);
+    const res = await updateVeloAction({
+      numSerie: velo.num_serie,
+      couleur: couleurNom,
+      couleurHex,
+      idType,
+      idFournisseur,
+      dateAcquisition: dateAcq,
+      idStation: idStation > 0 ? idStation : null,
+    });
+    setSaving(false);
+    if (!res.ok) {
+      setErr(res.error ?? "Erreur lors de la modification.");
+      return;
+    }
+    await onSaved();
+    onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#14232B]/55 p-4">
+      <form
+        onSubmit={handleSubmit}
+        className="card-sfax w-full max-w-lg space-y-4 p-6"
+      >
+        <h3 className="font-mono-sfax text-xl font-bold">
+          Modifier le vélo {velo.num_serie}
+        </h3>
+
+        {err && (
+          <div className="rounded border border-[#C8553D] bg-[#C8553D]/12 p-3 text-sm text-[#9B3925]">
+            {err}
+          </div>
+        )}
+
+        <div className="grid gap-3 md:grid-cols-2">
+          <div>
+            <label className="block text-xs font-semibold">Type</label>
+            <select
+              value={idType}
+              onChange={(e) => setIdType(Number(e.target.value))}
+              className="mt-1 w-full rounded border border-[#14232B] bg-[#F6F1E7] px-3 py-2 text-sm"
+            >
+              {types.map((t) => (
+                <option key={t.id_type} value={t.id_type}>
+                  {t.libelle}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold">
+              Date d&apos;acquisition
+            </label>
+            <input
+              type="date"
+              max={new Date().toISOString().slice(0, 10)}
+              value={dateAcq}
+              onChange={(e) => setDateAcq(e.target.value)}
+              required
+              className="mt-1 w-full rounded border border-[#14232B] bg-[#F6F1E7] px-3 py-2 font-mono-sfax text-sm"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold">Fournisseur</label>
+          <select
+            value={idFournisseur}
+            onChange={(e) => setIdFournisseur(Number(e.target.value))}
+            className="mt-1 w-full rounded border border-[#14232B] bg-[#F6F1E7] px-3 py-2 text-sm"
+          >
+            {fournisseurs.map((f) => (
+              <option key={f.id_fournisseur} value={f.id_fournisseur}>
+                {f.nom}
+                {f.archive ? " (Archivé)" : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {!velo.immatriculation_camion && (
+          <div>
+            <label className="block text-xs font-semibold">
+              Station d&apos;affectation
+            </label>
+            <select
+              value={idStation}
+              onChange={(e) => setIdStation(Number(e.target.value))}
+              className="mt-1 w-full rounded border border-[#14232B] bg-[#F6F1E7] px-3 py-2 text-sm"
+            >
+              <option value={0}>Hors station (atelier / entrepôt)</option>
+              {stations.map((s) => {
+                const isCurrent = s.id_station === velo.id_station;
+                const full = !isCurrent && s.nb_velos_actuel >= s.capacite;
+                return (
+                  <option
+                    key={s.id_station}
+                    value={s.id_station}
+                    disabled={full}
+                  >
+                    {s.nom} ({s.nb_velos_actuel}/{s.capacite})
+                    {full ? " — Pleine" : ""}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+        )}
+
+        <div>
+          <label className="block text-xs font-semibold">Couleur</label>
+          <div className="mt-1.5 flex flex-wrap gap-2">
+            {COULEURS.map((c) => (
+              <button
+                key={c.nom}
+                type="button"
+                onClick={() => {
+                  setCouleurNom(c.nom);
+                  setCouleurHex(c.hex);
+                }}
+                className={`inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs font-semibold ${
+                  couleurNom === c.nom
+                    ? "border-[#14232B] bg-[#F0A42B]/30"
+                    : "border-[#E3D9C6] bg-[#F6F1E7]"
+                }`}
+              >
+                <span
+                  className="h-3.5 w-3.5 rounded-full border border-[#14232B]"
+                  style={{ backgroundColor: c.hex }}
+                />
+                {c.nom}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn-sfax-outline px-4 py-2 text-sm"
+          >
+            Annuler
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="btn-sfax-primary px-5 py-2 text-sm"
+          >
+            {saving ? "Enregistrement..." : "Enregistrer"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 export function ParcVelosView({
   velos,
   types,
@@ -457,6 +644,7 @@ export function ParcVelosView({
   stations,
   onSelectBike,
   onAcquerir,
+  onRefresh,
 }: {
   velos: Velo[];
   types: TypeVelo[];
@@ -464,6 +652,7 @@ export function ParcVelosView({
   stations: Station[];
   onSelectBike: (numSerie: string) => void;
   onAcquerir: () => void;
+  onRefresh: () => Promise<void>;
 }) {
   const [search, setSearch] = useState("");
   const [etatFilter, setEtatFilter] = useState<EtatVelo | "ALL">("ALL");
@@ -472,6 +661,9 @@ export function ParcVelosView({
   const [fournFilter, setFournFilter] = useState<number | "ALL">("ALL");
   const [couleurFilter, setCouleurFilter] = useState<string>("ALL");
   const [showReformes, setShowReformes] = useState(false);
+  const [editingBike, setEditingBike] = useState<Velo | null>(null);
+  const [deletingBike, setDeletingBike] = useState<Velo | null>(null);
+  const [actionErr, setActionErr] = useState<string | null>(null);
 
   const uniqueColors = Array.from(new Set(velos.map((v) => v.couleur)));
 
@@ -658,6 +850,12 @@ export function ParcVelosView({
         </div>
       </div>
 
+      {actionErr && (
+        <div className="rounded border border-[#C8553D] bg-[#C8553D]/12 p-3 text-sm text-[#9B3925]">
+          {actionErr}
+        </div>
+      )}
+
       <div className="card-sfax-flat overflow-x-auto">
         <table className="w-full text-left text-base">
           <thead className="border-b-[1.5px] border-[#14232B] bg-[#F6F1E7] font-mono-sfax text-xs uppercase">
@@ -669,6 +867,7 @@ export function ParcVelosView({
               <th className="p-3.5">Localisation</th>
               <th className="p-3.5">État</th>
               <th className="p-3.5">Acquisition</th>
+              <th className="p-3.5">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#E3D9C6]">
@@ -715,11 +914,69 @@ export function ParcVelosView({
                 <td className="p-3.5 font-mono-sfax text-sm">
                   {formatDate(v.date_acquisition)}
                 </td>
+                <td className="p-3.5">
+                  <div className="flex items-center gap-2">
+                    {v.etat !== "LOUE" && v.etat !== "REFORME" && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActionErr(null);
+                          setEditingBike(v);
+                        }}
+                        className="rounded border border-[#14232B] bg-[#F6F1E7] p-2 hover:bg-[#E3D9C6]"
+                        aria-label={`Modifier ${v.num_serie}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                    )}
+                    {v.etat !== "LOUE" && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActionErr(null);
+                          setDeletingBike(v);
+                        }}
+                        className="rounded border border-[#C8553D] p-2 text-[#9B3925] hover:bg-[#C8553D]/10"
+                        aria-label={`Supprimer ${v.num_serie}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {editingBike && (
+        <EditVeloModal
+          velo={editingBike}
+          types={types}
+          fournisseurs={fournisseurs}
+          stations={stations}
+          onClose={() => setEditingBike(null)}
+          onSaved={onRefresh}
+        />
+      )}
+
+      <ConfirmModal
+        open={Boolean(deletingBike)}
+        title="Supprimer le vélo"
+        objectName={deletingBike?.num_serie ?? ""}
+        description="Cette action supprimera définitivement ce vélo s'il n'est lié à aucune location, réclamation ou contrôle."
+        onClose={() => setDeletingBike(null)}
+        onConfirm={async () => {
+          if (!deletingBike) return;
+          const r = await deleteVeloAction(deletingBike.num_serie);
+          if (!r.ok && r.error) setActionErr(r.error);
+          setDeletingBike(null);
+          await onRefresh();
+        }}
+      />
     </div>
   );
 }
@@ -748,6 +1005,8 @@ export function FicheVeloView({
   onNavigatePlanifier: (idRec: number) => void;
 }) {
   const [showReformeModal, setShowReformeModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [motif, setMotif] = useState<MotifReforme>("AMORTI");
   const [detail, setDetail] = useState("");
   const [err, setErr] = useState<string | null>(null);
@@ -901,16 +1160,69 @@ export function FicheVeloView({
             </button>
           )}
           {velo.etat !== "LOUE" && velo.etat !== "REFORME" && (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setErr(null);
+                  setShowEditModal(true);
+                }}
+                className="btn-sfax-outline inline-flex w-full items-center justify-center gap-2 py-2.5 text-sm"
+              >
+                <Pencil className="h-4 w-4" /> Modifier ce vélo
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowReformeModal(true)}
+                className="btn-sfax-outline w-full border-[#C8553D] py-2.5 text-sm text-[#9B3925]"
+              >
+                Réformer ce vélo
+              </button>
+            </>
+          )}
+          {velo.etat !== "LOUE" && (
             <button
               type="button"
-              onClick={() => setShowReformeModal(true)}
-              className="btn-sfax-outline w-full border-[#C8553D] py-2.5 text-sm text-[#9B3925]"
+              onClick={() => {
+                setErr(null);
+                setShowDeleteConfirm(true);
+              }}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-[6px] border-[1.5px] border-[#C8553D] bg-[#C8553D]/10 py-2.5 text-sm font-semibold text-[#9B3925] hover:bg-[#C8553D]/20"
             >
-              Réformer ce vélo
+              <Trash2 className="h-4 w-4" /> Supprimer ce vélo
             </button>
           )}
         </div>
       </div>
+
+      {showEditModal && (
+        <EditVeloModal
+          velo={velo}
+          types={types}
+          fournisseurs={fournisseurs}
+          stations={stations}
+          onClose={() => setShowEditModal(false)}
+          onSaved={onRefresh}
+        />
+      )}
+
+      <ConfirmModal
+        open={showDeleteConfirm}
+        title="Supprimer le vélo"
+        objectName={velo.num_serie}
+        description="Cette action supprimera définitivement ce vélo s'il n'est lié à aucune location, réclamation ou contrôle."
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={async () => {
+          const r = await deleteVeloAction(velo.num_serie);
+          setShowDeleteConfirm(false);
+          if (!r.ok && r.error) {
+            setErr(r.error);
+            return;
+          }
+          await onRefresh();
+          onBack();
+        }}
+      />
 
       {showReformeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#14232B]/55 p-4">
