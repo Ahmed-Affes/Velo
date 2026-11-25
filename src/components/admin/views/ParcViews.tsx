@@ -1293,12 +1293,14 @@ export function AcquerirVeloView({
   stations,
   velos,
   onDone,
+  onBack,
 }: {
   types: TypeVelo[];
   fournisseurs: Fournisseur[];
   stations: Station[];
   velos: Velo[];
-  onDone: () => Promise<void>;
+  onDone: (stayOnPage?: boolean) => Promise<void>;
+  onBack: () => void;
 }) {
   const [step, setStep] = useState(0);
   const [seriesMode, setSeriesMode] = useState(false);
@@ -1324,6 +1326,7 @@ export function AcquerirVeloView({
   const [replaceSerial, setReplaceSerial] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const serialList = seriesMode
     ? serialInput
@@ -1338,6 +1341,7 @@ export function AcquerirVeloView({
   async function handleSave(addAnother: boolean) {
     setErr(null);
     setMsg(null);
+    setSaving(true);
     const res = await acquerirVelosAction({
       numSeries: serialList,
       couleur: couleur.nom,
@@ -1348,12 +1352,13 @@ export function AcquerirVeloView({
       dateAcquisition: dateAcq,
       remplaceNumSerie: isReplacement && replaceSerial ? replaceSerial : null,
     });
+    setSaving(false);
     if (!res.ok) {
       setErr(res.error ?? res.failures?.[0]?.reason ?? "Erreur");
       return;
     }
     setMsg(`${res.created?.length ?? 1} vélo(s) enregistré(s) avec succès.`);
-    await onDone();
+    await onDone(addAnother);
     if (addAnother) {
       setSerialInput("");
       setStep(0);
@@ -1362,6 +1367,13 @@ export function AcquerirVeloView({
 
   return (
     <div className="space-y-6">
+      <button
+        type="button"
+        onClick={onBack}
+        className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#0E5A6B] hover:underline"
+      >
+        <ArrowLeft className="h-4 w-4" /> Retour au parc
+      </button>
       <h2 className="text-2xl font-bold">Acquérir un vélo</h2>
       <RouteLineStepper
         steps={[
@@ -1656,7 +1668,7 @@ export function AcquerirVeloView({
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    disabled={idStation <= 0}
+                    disabled={idStation <= 0 || saving}
                     onClick={() => handleSave(true)}
                     className="btn-sfax-outline px-4 py-2 text-sm"
                   >
@@ -1664,11 +1676,11 @@ export function AcquerirVeloView({
                   </button>
                   <button
                     type="button"
-                    disabled={idStation <= 0}
+                    disabled={idStation <= 0 || saving}
                     onClick={() => handleSave(false)}
                     className="btn-sfax-primary px-6 py-2 text-sm"
                   >
-                    Enregistrer
+                    {saving ? "Enregistrement..." : "Enregistrer"}
                   </button>
                 </div>
               </div>

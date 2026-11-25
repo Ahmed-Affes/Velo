@@ -490,7 +490,11 @@ export function AdminShell({
               fournisseurs={data.fournisseurs}
               stations={data.stations}
               velos={data.velos}
-              onDone={refresh}
+              onBack={() => setRoute("R3")}
+              onDone={async (stayOnPage) => {
+                await refresh();
+                if (!stayOnPage) setRoute("R3");
+              }}
             />
           )}
           {route === "R6" && (
